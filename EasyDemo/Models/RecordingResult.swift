@@ -14,6 +14,7 @@ struct RecordingResult: Identifiable {
     let duration: TimeInterval
     let fileSize: Int64
     let timestamp: Date
+    var projectFolder: URL? = nil
 
     var fileSizeString: String {
         let formatter = ByteCountFormatter()

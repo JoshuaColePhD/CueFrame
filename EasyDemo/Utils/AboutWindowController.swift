@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 
+@MainActor
 final class AboutWindowController {
     static let shared = AboutWindowController()
 

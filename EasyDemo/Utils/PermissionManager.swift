@@ -136,6 +136,7 @@ class PermissionManager: ObservableObject {
         await checkScreenRecordingPermission()
 
         isScreenRecordingRequestInFlight = false
+        if !screenRecordingStatus.isGranted { openSystemSettings(for: .screenRecording) }
 
         return screenRecordingStatus.isGranted
     }

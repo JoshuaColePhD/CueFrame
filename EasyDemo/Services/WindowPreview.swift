@@ -1,194 +1,34 @@
-//
-//  WindowPreview.swift
-//  EasyDemo
-//
-//  Created by Daniel Oquelis on 28.10.25.
-//
-
-import Foundation
-import SwiftUI
+import AppKit
 import ScreenCaptureKit
 import Combine
-import CoreMedia
-import AppKit
 
-/// Service for rendering window previews with backgrounds
 @MainActor
-class WindowPreview: NSObject, ObservableObject, SCStreamOutput {
+final class WindowPreview: ObservableObject {
     @Published var previewImage: CGImage?
     @Published var isCapturing = false
+    @Published var failure: String?
 
-    private var stream: SCStream?
-    private var continuation: CheckedContinuation<CGImage?, Never>?
-
-    /// Capture a single frame from a window for preview
-    func capturePreview(window: WindowInfo) async {
+    func capturePreview(window: WindowInfo, authorizedFilter: SCContentFilter? = nil) async {
+        if let authorizedFilter { await capture(filter: authorizedFilter); return }
+        guard let value = window.scWindow else { failure = "Choose the window again."; return }
+        await capture(filter: SCContentFilter(desktopIndependentWindow: value))
+    }
+    func capturePreview(display: DisplayInfo, authorizedFilter: SCContentFilter? = nil) async {
+        if let authorizedFilter { await capture(filter: authorizedFilter); return }
+        guard let value = display.scDisplay else { failure = "Choose the display again."; return }
+        await capture(filter: SCContentFilter(display: value, excludingWindows: []))
+    }
+    private func capture(filter: SCContentFilter) async {
         guard !isCapturing else { return }
-        isCapturing = true
-
+        isCapturing = true; failure = nil
         defer { isCapturing = false }
-
         do {
-            let content = try await SCShareableContent.current
-
-            // Find the SCWindow matching our WindowInfo
-            guard let scWindow = content.windows.first(where: { $0.windowID == window.id }) else {
-                print("Window not found")
-                return
-            }
-
-            // Create filter for this specific window
-            let filter = SCContentFilter(desktopIndependentWindow: scWindow)
-
-            // Configure stream for single frame capture at native resolution
-            // Use filter's pointPixelScale for accurate native resolution
-            let config = SCStreamConfiguration()
-            config.width = Int(filter.contentRect.width * CGFloat(filter.pointPixelScale))
-            config.height = Int(filter.contentRect.height * CGFloat(filter.pointPixelScale))
-            config.pixelFormat = kCVPixelFormatType_32BGRA
-            config.showsCursor = false
-            config.captureResolution = .best
-            config.scalesToFit = false
-            config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
-
-            // Create stream
-            let stream = SCStream(filter: filter, configuration: config, delegate: nil)
-            self.stream = stream
-
-            // Add output handler
-            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
-
-            // Start capture and wait for first frame
-            try await stream.startCapture()
-
-            // Wait for frame with timeout
-            let image = await withCheckedContinuation { continuation in
-                self.continuation = continuation
-
-                // Timeout after 5 seconds
-                Task {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
-                    if self.continuation != nil {
-                        self.continuation?.resume(returning: nil)
-                        self.continuation = nil
-                    }
-                }
-            }
-
-            // Stop capture
-            try await stream.stopCapture()
-            self.stream = nil
-
-            // Update preview image
-            if let image = image {
-                self.previewImage = image
-            }
-        } catch {
-            print("Failed to capture preview: \(error)")
-        }
-    }
-
-    /// Capture a single frame from a display for preview
-    func capturePreview(display: DisplayInfo) async {
-        guard !isCapturing else { return }
-        isCapturing = true
-
-        defer { isCapturing = false }
-
-        do {
-            let content = try await SCShareableContent.current
-
-            guard let scDisplay = content.displays.first(where: { $0.displayID == display.id }) else {
-                print("Display not found")
-                return
-            }
-
-            let filter = SCContentFilter(display: scDisplay, excludingWindows: [])
-
-            let config = SCStreamConfiguration()
-            config.width = Int(filter.contentRect.width * CGFloat(filter.pointPixelScale))
-            config.height = Int(filter.contentRect.height * CGFloat(filter.pointPixelScale))
-            config.pixelFormat = kCVPixelFormatType_32BGRA
-            config.showsCursor = false
-            config.captureResolution = .best
-            config.scalesToFit = false
-            config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
-
-            let stream = SCStream(filter: filter, configuration: config, delegate: nil)
-            self.stream = stream
-
-            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
-
-            try await stream.startCapture()
-
-            let image = await withCheckedContinuation { continuation in
-                self.continuation = continuation
-
-                Task {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
-                    if self.continuation != nil {
-                        self.continuation?.resume(returning: nil)
-                        self.continuation = nil
-                    }
-                }
-            }
-
-            try await stream.stopCapture()
-            self.stream = nil
-
-            if let image = image {
-                self.previewImage = image
-            }
-        } catch {
-            print("Failed to capture display preview: \(error)")
-        }
-    }
-
-    /// Capture a preview from a CaptureSource (dispatches to window or display method)
-    func capturePreview(source: CaptureSource) async {
-        switch source {
-        case .window(let windowInfo):
-            await capturePreview(window: windowInfo)
-        case .display(let displayInfo):
-            await capturePreview(display: displayInfo)
-        }
-    }
-
-    // MARK: - SCStreamOutput
-
-    func stream(
-        _ stream: SCStream,
-        didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
-        of type: SCStreamOutputType
-    ) {
-        guard let imageBuffer = sampleBuffer.imageBuffer else { return }
-
-        // Convert to CGImage
-        if let cgImage = createCGImage(from: imageBuffer) {
-            // Resume continuation with the captured frame
-            if let continuation = continuation {
-                self.continuation = nil
-                continuation.resume(returning: cgImage)
-            }
-        }
-    }
-
-    /// Convert CVPixelBuffer to CGImage
-    private func createCGImage(from pixelBuffer: CVPixelBuffer) -> CGImage? {
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-        let context = CIContext()
-        return context.createCGImage(ciImage, from: ciImage.extent)
-    }
-
-    /// Stop any ongoing capture
-    func stopCapture() async {
-        if let stream = stream {
-            do {
-                try await stream.stopCapture()
-            } catch {
-                print("Failed to stop capture: \(error)")
-            }
-        }
-        stream = nil
+            let configuration = SCStreamConfiguration()
+            let scale = min(1, 1920 / max(filter.contentRect.width * CGFloat(filter.pointPixelScale), 1))
+            configuration.width = max(2, Int(filter.contentRect.width * CGFloat(filter.pointPixelScale) * scale))
+            configuration.height = max(2, Int(filter.contentRect.height * CGFloat(filter.pointPixelScale) * scale))
+            configuration.showsCursor = false
+            previewImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+        } catch { failure = error.localizedDescription }
     }
 }

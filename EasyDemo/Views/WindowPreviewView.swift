@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import ScreenCaptureKit
 
 /// View for previewing selected window with background
 struct WindowPreviewView: View {
@@ -13,6 +14,7 @@ struct WindowPreviewView: View {
     let backgroundStyle: BackgroundStyle
     @Binding var webcamConfig: WebcamConfiguration
     let windowScale: Double  // 0.2 to 1.0 (20% to 100%)
+    var authorizedFilter: SCContentFilter? = nil
     @StateObject private var preview = WindowPreview()
     @StateObject private var webcam = WebcamCapture()
     @StateObject private var recordingEngine = RecordingEngine.shared
@@ -44,12 +46,11 @@ struct WindowPreviewView: View {
                         )
                 } else {
                     VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-
-                        Text("Capturing preview...")
+                        Image(systemName: "macwindow").font(.system(size: 48))
+                        Text(authorizedFilter != nil ? "Ready to record \(window.displayName)" : (preview.failure ?? "Preparing preview…"))
                             .font(.headline)
                             .foregroundColor(.secondary)
+                        if authorizedFilter != nil { Text("Screen capture begins when you press Start recording.").font(.caption).foregroundStyle(.secondary) }
                     }
                 }
 
@@ -62,7 +63,7 @@ struct WindowPreviewView: View {
             .clipped()
         }
         .task {
-            await preview.capturePreview(window: window)
+            if authorizedFilter == nil { await preview.capturePreview(window: window) }
             await syncWebcamCapture()
         }
         .onChange(of: webcamConfig.isEnabled) { _, isEnabled in
@@ -272,6 +273,7 @@ struct DisplayPreviewView: View {
     let backgroundStyle: BackgroundStyle
     @Binding var webcamConfig: WebcamConfiguration
     let displayScale: Double
+    var authorizedFilter: SCContentFilter? = nil
     @StateObject private var preview = WindowPreview()
     @StateObject private var webcam = WebcamCapture()
     @StateObject private var recordingEngine = RecordingEngine.shared
@@ -304,12 +306,11 @@ struct DisplayPreviewView: View {
                         )
                 } else {
                     VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-
-                        Text("Capturing display preview...")
+                        Image(systemName: "display").font(.system(size: 48))
+                        Text(authorizedFilter != nil ? "Ready to record this display" : (preview.failure ?? "Preparing preview…"))
                             .font(.headline)
                             .foregroundColor(.secondary)
+                        if authorizedFilter != nil { Text("Screen capture begins when you press Start recording.").font(.caption).foregroundStyle(.secondary) }
                     }
                 }
 
@@ -322,7 +323,7 @@ struct DisplayPreviewView: View {
             .clipped()
         }
         .task {
-            await preview.capturePreview(display: display)
+            if authorizedFilter == nil { await preview.capturePreview(display: display) }
             await syncWebcamCapture()
         }
         .onChange(of: webcamConfig.isEnabled) { _, isEnabled in
@@ -547,7 +548,7 @@ struct WebcamOverlayView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+                    .clipShape(SquircleShape())
                     .shadow(color: .black.opacity(0.7), radius: 15, x: 0, y: 8)
             }
         }

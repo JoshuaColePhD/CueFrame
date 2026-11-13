@@ -1,470 +1,166 @@
-//
-//  SetupView.swift
-//  EasyDemo
-//
-//  Created by Daniel Oquelis on 28.10.25.
-//
-
 import SwiftUI
-import UniformTypeIdentifiers
-import AppKit
+import AVFoundation
+import ScreenCaptureKit
 
-/// Main setup view orchestrating source selection, background choice, and preview
+struct ReviewDestination: Identifiable {
+    let folder: URL
+    var id: String { folder.path }
+}
+
 struct SetupView: View {
+    @State private var preferences = RecorderPreferences.load()
+    @State private var background = RecorderPreferences.load().background.style
     @State private var selectedSource: CaptureSource?
-    @State private var selectedBackground: BackgroundStyle = BackgroundStyle.defaultBigSur
-    @State private var webcamConfig = WebcamConfiguration.default
-    @State private var audioConfig = AudioConfiguration.default
-    @State private var selectedResolution: RecordingConfiguration.Resolution = .original
-    @State private var selectedCodec: RecordingConfiguration.VideoCodec = .h264
-    @State private var frameRate: Int = 60
-    @State private var windowScale: Double = 0.9  // 90% by default
-    @State private var showingWindowSelector = true
-    @State private var expandedSection: SidebarSection? = .background
-    @State private var recordingResult: RecordingResult?
-    @State private var showingFolderPicker = false
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @StateObject private var recordingEngine = RecordingEngine.shared
-    @StateObject private var outputDirectoryManager = OutputDirectoryManager()
-
-    enum SidebarSection: Hashable {
-        case windowSize
-        case background
-        case webcam
-        case audio
-        case advanced
-        case output
-    }
-
-    private var isDisplayCapture: Bool {
-        selectedSource?.isDisplay ?? false
-    }
+    @State private var choosingSource = false
+    @State private var showingLibrary = false
+    @State private var review: ReviewDestination?
+    @State private var pendingProject: URL?
+    @State private var message: String?
+    @StateObject private var engine = RecordingEngine.shared
+    @StateObject private var permissions = PermissionManager.shared
+    @StateObject private var sourcePicker = SystemSourcePicker()
+    @State private var nativeFilter: SCContentFilter?
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            // Sidebar with setup options
-            setupSidebar
-                .navigationSplitViewColumnWidth(min: 300, ideal: 350, max: 400)
-                .toolbar(removing: .sidebarToggle)
-        } detail: {
-            // Main preview area
-            if let source = selectedSource {
-                switch source {
-                case .window(let window):
-                    WindowPreviewView(
-                        window: window,
-                        backgroundStyle: selectedBackground,
-                        webcamConfig: $webcamConfig,
-                        windowScale: windowScale
-                    )
-                    .id(source.id)
-                    .navigationTitle("Preview")
-                    .toolbar(removing: .sidebarToggle)
-                case .display(let display):
-                    DisplayPreviewView(
-                        display: display,
-                        backgroundStyle: selectedBackground,
-                        webcamConfig: $webcamConfig,
-                        displayScale: windowScale
-                    )
-                    .id(source.id)
-                    .navigationTitle("Preview")
-                    .toolbar(removing: .sidebarToggle)
-                }
-            } else {
-                emptyPreviewState
-                    .toolbar(removing: .sidebarToggle)
-            }
-        }
-        .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 900, minHeight: 600)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    toggleSidebar()
-                } label: {
-                    Image(systemName: "sidebar.leading")
-                }
-                .help("Toggle Sidebar")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var setupSidebar: some View {
-        List {
-            Section("Source Selection") {
-                if let source = selectedSource {
+        NavigationSplitView {
+            Form {
+                Section("Capture source") {
+                    Text(selectedSource?.displayName ?? "Choose a window or display")
+                        .font(.headline).lineLimit(2)
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(source.displayName)
-                                .font(.headline)
-
-                            Text("\(Int(source.bounds.width)) x \(Int(source.bounds.height))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
-                        Button("Change") {
-                            showingWindowSelector = true
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(recordingEngine.isRecording)
+                        Button("Choose window…") { sourcePicker.present(style: .window) }
+                        Button("Choose display…") { sourcePicker.present(style: .display) }
                     }
-                } else {
-                    Button("Select Source") {
-                        showingWindowSelector = true
-                    }
-                    .disabled(recordingEngine.isRecording)
+                    Text(nativeFilter != nil ? "Selected content authorized by macOS" : "Choose a source in the macOS sharing picker")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section("Audio") { AudioSettingsView(configuration: $preferences.audio) }
+                Section("Webcam overlay") {
+                    Text(permissions.cameraStatus.isGranted ? "Camera access granted" : "Camera access required when overlay is enabled")
+                        .font(.caption).foregroundStyle(.secondary)
+                    WebcamSettingsView(configuration: $preferences.webcam)
+                }
+                Section("Appearance") {
+                    DisclosureGroup("Background") { BackgroundSelectionView(selectedBackground: $background) }
+                    LabeledContent("Screen size", value: "\(Int(preferences.windowScale * 100))%")
+                    Slider(value: $preferences.windowScale, in: 0.5...1).accessibilityLabel("Screen size")
+                }
+                Section("Export quality") {
+                    RecordingSettingsView(selectedResolution: $preferences.resolution, selectedCodec: $preferences.codec, frameRate: $preferences.frameRate)
+                }
+                Section {
+                    Text("Original tracks are saved automatically in your recording library. Export a finished video after recording.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
-
-            if selectedSource != nil {
-                Section(isDisplayCapture ? "Display Scale" : "Window Size") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Scale:")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("\(Int(windowScale * 100))%")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Slider(value: $windowScale, in: 0.2...1.0, step: 0.05)
-                            .tint(.accentColor)
-                            .disabled(recordingEngine.isRecording)
-                            .frame(height: 20)
-
-                        HStack {
-                            Text("20%")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("100%")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
-                    .padding(.vertical, 4)
-                }
-
-                Section {
-                    Button {
-                        expandedSection = expandedSection == .background ? nil : .background
-                    } label: {
-                        HStack {
-                            Label {
-                                Text("Background")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            } icon: {
-                                Image(systemName: "photo")
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: expandedSection == .background ? "chevron.down" : "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .rotationEffect(.degrees(expandedSection == .background ? 0 : 0))
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(recordingEngine.isRecording)
-
-                    if expandedSection == .background {
-                        BackgroundSelectionView(selectedBackground: $selectedBackground)
-                            .padding(.top, 8)
-                            .padding(.bottom, 8)
-                            .padding(.horizontal, 8)
-                            .background(Color(.controlBackgroundColor).opacity(0.5))
-                            .cornerRadius(8)
-                            .disabled(recordingEngine.isRecording)
-                    }
-                }
-
-                Section {
-                    Button {
-                        expandedSection = expandedSection == .webcam ? nil : .webcam
-                    } label: {
-                        HStack {
-                            Label {
-                                Text("Webcam Overlay")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            } icon: {
-                                Image(systemName: "video.circle")
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: expandedSection == .webcam ? "chevron.down" : "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(recordingEngine.isRecording)
-
-                    if expandedSection == .webcam {
-                        WebcamSettingsView(configuration: $webcamConfig)
-                            .padding(.top, 8)
-                            .padding(.bottom, 8)
-                            .padding(.horizontal, 8)
-                            .background(Color(.controlBackgroundColor).opacity(0.5))
-                            .cornerRadius(8)
-                            .disabled(recordingEngine.isRecording)
-                    }
-                }
-
-                Section {
-                    Button {
-                        expandedSection = expandedSection == .audio ? nil : .audio
-                    } label: {
-                        HStack {
-                            Label {
-                                Text("Audio Recording")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            } icon: {
-                                Image(systemName: "waveform")
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: expandedSection == .audio ? "chevron.down" : "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(recordingEngine.isRecording)
-
-                    if expandedSection == .audio {
-                        AudioSettingsView(configuration: $audioConfig)
-                            .padding(.top, 8)
-                            .padding(.bottom, 8)
-                            .padding(.horizontal, 8)
-                            .background(Color(.controlBackgroundColor).opacity(0.5))
-                            .cornerRadius(8)
-                            .disabled(recordingEngine.isRecording)
-                    }
-                }
-
-                Section {
-                    Button {
-                        expandedSection = expandedSection == .advanced ? nil : .advanced
-                    } label: {
-                        HStack {
-                            Label {
-                                Text("Advanced Quality Settings")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            } icon: {
-                                Image(systemName: "gearshape.2")
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: expandedSection == .advanced ? "chevron.down" : "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(recordingEngine.isRecording)
-
-                    if expandedSection == .advanced {
-                        RecordingSettingsView(
-                            selectedResolution: $selectedResolution,
-                            selectedCodec: $selectedCodec,
-                            frameRate: $frameRate
-                        )
-                        .padding(.top, 8)
-                        .padding(.bottom, 8)
-                        .padding(.horizontal, 8)
-                        .background(Color(.controlBackgroundColor).opacity(0.5))
-                        .cornerRadius(8)
-                        .disabled(recordingEngine.isRecording)
-                    }
-                }
-
-                Section {
-                    Button {
-                        expandedSection = expandedSection == .output ? nil : .output
-                    } label: {
-                        HStack {
-                            Label {
-                                Text("Output")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            } icon: {
-                                Image(systemName: "folder")
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: expandedSection == .output ? "chevron.down" : "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(recordingEngine.isRecording)
-
-                    if expandedSection == .output {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Save Location")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-
-                            Button {
-                                showingFolderPicker = true
-                            } label: {
-                                HStack {
-                                    Image(systemName: "folder")
-                                    Text(outputDirectoryManager.customOutputDirectory?.lastPathComponent ?? "Temporary Folder")
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .padding(8)
-                            .background(Color(.controlBackgroundColor))
-                            .cornerRadius(8)
-                            .disabled(recordingEngine.isRecording)
-                        }
-                        .padding(.top, 8)
-                        .padding(.bottom, 8)
-                        .padding(.horizontal, 8)
-                        .background(Color(.controlBackgroundColor).opacity(0.5))
-                        .cornerRadius(8)
-                    }
-                }
-
-                Section("Recording") {
-                    if recordingEngine.isRecording {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Circle()
-                                    .fill(.red)
-                                    .frame(width: 8, height: 8)
-
-                                Text("Recording")
-                                    .font(.headline)
-                                    .foregroundColor(.red)
-                            }
-
-                            Text(formatDuration(recordingEngine.recordingDuration))
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundColor(.secondary)
-
-                            Button {
-                                Task {
-                                    await recordingEngine.stopRecording()
-                                }
-                            } label: {
-                                Label("Stop Recording", systemImage: "stop.circle.fill")
-                            }
-                            .buttonStyle(.borderedProminent)
+            .formStyle(.grouped)
+            .disabled(engine.isRecording)
+            .navigationTitle("Record")
+            .navigationSplitViewColumnWidth(min: 310, ideal: 350, max: 430)
+        } detail: {
+            VStack(spacing: 0) {
+                Group {
+                    if engine.isRecording {
+                        VStack(spacing: 16) {
+                            Image(systemName: "record.circle").font(.system(size: 54)).foregroundStyle(.red)
+                            Text(engine.phase == .recording ? "Recording your demo" : engine.phase == .starting ? engine.startupStatus : "Saving source tracks…")
+                                .font(.title2)
+                            Text(engine.recordingDuration, format: .number.precision(.fractionLength(1)))
+                                .monospacedDigit().font(.title)
+                            Text("Screen, webcam and audio are saved independently for editing.")
+                                .foregroundStyle(.secondary)
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let source = selectedSource {
+                        switch source {
+                        case .window(let window):
+                            WindowPreviewView(window: window, backgroundStyle: background, webcamConfig: $preferences.webcam, windowScale: preferences.windowScale, authorizedFilter: nativeFilter)
+                                .id(source.id)
+                        case .display(let display):
+                            DisplayPreviewView(display: display, backgroundStyle: background, webcamConfig: $preferences.webcam, displayScale: preferences.windowScale, authorizedFilter: nativeFilter)
+                                .id(source.id)
                         }
                     } else {
-                        Button {
-                            if let source = selectedSource {
-                                let config = RecordingConfiguration.default(
-                                    source: source,
-                                    background: selectedBackground,
-                                    webcam: webcamConfig,
-                                    audio: audioConfig,
-                                    resolution: selectedResolution,
-                                    frameRate: frameRate,
-                                    codec: selectedCodec,
-                                    outputDirectory: outputDirectoryManager.customOutputDirectory,
-                                    windowScale: windowScale
-                                )
-                                Task {
-                                    do {
-                                        try await recordingEngine.startRecording(
-                                            configuration: config,
-                                            outputDirectoryManager: outputDirectoryManager
-                                        )
-                                    } catch {
-                                        print("Failed to start recording: \(error)")
-                                    }
-                                }
+                        ContentUnavailableView {
+                            Label("Make a quick demo", systemImage: "rectangle.inset.filled.and.person.filled")
+                        } description: {
+                            Text("Choose a window or display, check your microphone, then record. Drag the webcam after choosing Custom position.")
+                        } actions: {
+                            HStack {
+                                Button("Choose a window") { sourcePicker.present(style: .window) }.buttonStyle(.borderedProminent)
+                                Button("Choose a display") { sourcePicker.present(style: .display) }
                             }
-                        } label: {
-                            Label("Start Recording", systemImage: "record.circle")
                         }
-                        .disabled(selectedSource == nil)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Divider()
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(engine.isRecording ? engine.phase.rawValue.capitalized : "Ready when you are").font(.headline)
+                        Text("\(preferences.audio.microphoneEnabled ? "Voice on" : "Voice off") · \(preferences.webcam.isEnabled ? "Camera on" : "Camera off") · \(preferences.audio.systemAudioEnabled ? "Mac audio on" : "Mac audio off")")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if engine.isRecording {
+                        Button(engine.canCancelStartup ? "Cancel startup" : "Stop recording", systemImage: "stop.fill") {
+                            if engine.canCancelStartup { engine.cancelStartup() }
+                            else { Task { _ = await engine.stopRecording() } }
+                        }
+                            .disabled(engine.phase != .recording && !engine.canCancelStartup)
+                            .buttonStyle(.borderedProminent).tint(.red).keyboardShortcut("r", modifiers: [.command, .shift])
+                    } else {
+                        Button("Start recording", systemImage: "record.circle") { start() }
+                            .disabled(selectedSource == nil)
+                            .buttonStyle(.borderedProminent).keyboardShortcut("r", modifiers: [.command, .shift])
+                    }
+                }.padding(20)
+            }.navigationTitle("EasyDemo")
+        }
+        .frame(minWidth: 1000, minHeight: 680)
+        .toolbar {
+            Button("Recordings", systemImage: "film.stack") { showingLibrary = true }.disabled(engine.isRecording)
+            SettingsLink { Label("AI settings", systemImage: "sparkles") }.disabled(engine.isRecording)
+        }
+        .task { await permissions.checkAllPermissions() }
+        .onChange(of: sourcePicker.revision) {
+            selectedSource = sourcePicker.source; nativeFilter = sourcePicker.filter
+        }
+        .onChange(of: sourcePicker.failure) { if let failure = sourcePicker.failure { message = failure } }
+        .onChange(of: background) { preferences.background = SavedBackground(background) }
+        .onChange(of: try? JSONEncoder().encode(preferences)) {
+            do { try preferences.save() } catch { message = error.localizedDescription }
+        }
+        .onChange(of: engine.lastRecordingResult?.id) {
+            if let folder = engine.lastRecordingResult?.projectFolder {
+                review = ReviewDestination(folder: folder)
+                selectedSource = nil; nativeFilter = nil
             }
         }
-        .safeAreaInset(edge: .top) {
-            Color.clear.frame(height: 0)
-        }
-        .navigationTitle("Setup")
-        .sheet(isPresented: $showingWindowSelector) {
+        .onChange(of: engine.error?.localizedDescription) { if let error = engine.error { message = error.localizedDescription } }
+        .sheet(isPresented: $choosingSource, onDismiss: { Task { await permissions.checkAllPermissions() } }) {
             WindowSelectorSheet(selectedSource: $selectedSource)
         }
-        .sheet(item: $recordingResult) { result in
-            RecordingCompletedView(result: result, outputDirectoryManager: outputDirectoryManager)
+        .sheet(isPresented: $showingLibrary, onDismiss: {
+            if let pendingProject { review = ReviewDestination(folder: pendingProject); self.pendingProject = nil }
+        }) {
+            RecordingLibraryView { folder in pendingProject = folder; showingLibrary = false }
         }
-        .fileImporter(
-            isPresented: $showingFolderPicker,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    outputDirectoryManager.saveOutputDirectory(url)
-                }
-            case .failure(let error):
-                print("Failed to select folder: \(error)")
-            }
-        }
-        .onChange(of: recordingEngine.lastRecordingResult?.id) {
-            if let result = recordingEngine.lastRecordingResult {
-                recordingResult = result
-            }
-        }
+        .sheet(item: $review) { destination in ProjectReviewView(folder: destination.folder) }
+        .alert("EasyDemo", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK") { message = nil }
+        } message: { Text(message ?? "") }
     }
 
-    private var emptyPreviewState: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "macwindow.on.rectangle")
-                .font(.system(size: 64))
-                .foregroundColor(.secondary)
-
-            Text("Select a source to preview")
-                .font(.title2)
-                .foregroundColor(.secondary)
-
-            Button("Choose Source") {
-                showingWindowSelector = true
-            }
-            .buttonStyle(.borderedProminent)
-        }
-    }
-
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let minutes = Int(duration) / 60
-        let seconds = Int(duration) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
-    }
-
-    private func toggleSidebar() {
-        withAnimation {
-            if columnVisibility == .all {
-                columnVisibility = .detailOnly
-            } else {
-                columnVisibility = .all
-            }
+    private func start() {
+        guard let selectedSource else { return }
+        var config = RecordingConfiguration(source: selectedSource, background: background, webcam: preferences.webcam,
+            audio: preferences.audio, resolution: preferences.resolution, frameRate: preferences.frameRate,
+            codec: preferences.codec, outputURL: RecordingProject.root.appendingPathComponent("export.mp4"), windowScale: preferences.windowScale)
+        config.authorizedFilter = nativeFilter
+        Task {
+            do { try await engine.startRecording(configuration: config) }
+            catch is CancellationError {}
+            catch { message = error.localizedDescription }
         }
     }
 }

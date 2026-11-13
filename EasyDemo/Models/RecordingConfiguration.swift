@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import AVFoundation
+import ScreenCaptureKit
 
 struct RecordingConfiguration {
     let source: CaptureSource
@@ -12,8 +13,9 @@ struct RecordingConfiguration {
     let codec: VideoCodec
     let outputURL: URL
     let windowScale: Double
+    var authorizedFilter: SCContentFilter? = nil
 
-    enum Resolution: String, CaseIterable, Identifiable {
+    enum Resolution: String, Codable, CaseIterable, Identifiable {
         case hd1080 = "1080p HD"
         case hd1440 = "1440p QHD"
         case uhd4k = "4K UHD"
@@ -35,7 +37,7 @@ struct RecordingConfiguration {
         }
     }
 
-    enum VideoCodec: String, CaseIterable, Identifiable {
+    enum VideoCodec: String, Codable, CaseIterable, Identifiable {
         case h264 = "H.264"
         case hevc = "HEVC (H.265)"
         case prores = "ProRes 422"

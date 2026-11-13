@@ -17,6 +17,7 @@ class WebcamCapture: NSObject, ObservableObject {
     @Published var isCapturing = false
     @Published var hasCameraPermission = false
 
+    private var captureGeneration = UUID()
     private var captureSession: AVCaptureSession?
     private var videoOutput: AVCaptureVideoDataOutput?
     private let captureQueue = DispatchQueue(label: "com.easydemo.webcam", qos: .userInteractive)
@@ -60,10 +61,7 @@ class WebcamCapture: NSObject, ObservableObject {
 
         // Stop all active instances
         for ref in activeInstances {
-            if let instance = ref.instance, instance.isCapturing {
-                instance.captureSession?.stopRunning()
-                instance.isCapturing = false
-            }
+            ref.instance?.stopCapture()
         }
     }
 
@@ -88,6 +86,8 @@ class WebcamCapture: NSObject, ObservableObject {
 
     /// Start webcam capture
     func startCapture(deviceId: String? = nil) async throws {
+        let generation = UUID()
+        captureGeneration = generation
         if !hasCameraPermission {
             let granted = await requestCameraPermission()
             if !granted {
@@ -96,6 +96,7 @@ class WebcamCapture: NSObject, ObservableObject {
             hasCameraPermission = true
         }
 
+        guard captureGeneration == generation, !Task.isCancelled else { throw CancellationError() }
         guard !isCapturing else { return }
 
         let session = AVCaptureSession()
@@ -154,6 +155,10 @@ class WebcamCapture: NSObject, ObservableObject {
         self.videoOutput = output
 
         try await startSession(session)
+        guard captureGeneration == generation, !Task.isCancelled else {
+            captureQueue.async { session.stopRunning() }
+            throw CancellationError()
+        }
         isCapturing = true
     }
 
@@ -180,6 +185,7 @@ class WebcamCapture: NSObject, ObservableObject {
 
     /// Stop webcam capture
     func stopCapture() {
+        captureGeneration = UUID()
         let session = captureSession
         captureQueue.async {
             session?.stopRunning()
@@ -211,12 +217,8 @@ class WebcamCapture: NSObject, ObservableObject {
     private func selectDevice(withId deviceId: String?) -> AVCaptureDevice? {
         let devices = Self.availableVideoDevices()
 
-        if let deviceId = deviceId,
-           let specified = devices.first(where: { $0.uniqueID == deviceId }) {
-            return specified
-        }
-
-        return devices.first
+        if let deviceId { return devices.first { $0.uniqueID == deviceId } }
+        return AVCaptureDevice.default(for: .video) ?? devices.first
     }
 
     private func startSession(_ session: AVCaptureSession) async throws {

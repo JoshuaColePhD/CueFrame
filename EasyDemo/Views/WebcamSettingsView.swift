@@ -44,7 +44,6 @@ struct WebcamSettingsView: View {
 
                             await MainActor.run {
                                 refreshDevices()
-                                validateSelectedDevice()
 
                                 if devices.isEmpty {
                                     configuration.isEnabled = false
@@ -79,6 +78,9 @@ struct WebcamSettingsView: View {
                         Text("System Default").tag("")
                         ForEach(devices, id: \.uniqueID) { device in
                             Text(device.localizedName).tag(device.uniqueID)
+                        }
+                        if let id = configuration.selectedDeviceId, !devices.contains(where: { $0.uniqueID == id }) {
+                            Text("Disconnected camera").tag(id)
                         }
                     }
                     .pickerStyle(.menu)
@@ -138,28 +140,18 @@ struct WebcamSettingsView: View {
         }
         .onAppear {
             refreshDevices()
-            validateSelectedDevice()
         }
         // Refresh device list on connect/disconnect
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasConnectedNotification)) { _ in
             refreshDevices()
-            validateSelectedDevice()
         }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) { _ in
             refreshDevices()
-            validateSelectedDevice()
         }
     }
 
     private func refreshDevices() {
         devices = WebcamCapture.availableVideoDevices()
-    }
-
-    private func validateSelectedDevice() {
-        if let selectedId = configuration.selectedDeviceId,
-           !devices.contains(where: { $0.uniqueID == selectedId }) {
-            configuration.selectedDeviceId = nil
-        }
     }
 
     private func defaultCustomPosition(from previousPosition: WebcamConfiguration.Position) -> WebcamConfiguration.NormalizedPosition {
