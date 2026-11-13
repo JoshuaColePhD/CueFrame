@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: macos-15
@@ -19,8 +23,18 @@ jobs:
         run: >-
           xcodebuild -project EasyDemo.xcodeproj -scheme EasyDemo
           -configuration Debug -derivedDataPath build/DerivedData
+          -resultBundlePath build/TestResults.xcresult
           CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
           -only-testing:EasyDemoTests test
+      - name: Report test results
+        if: always()
+        run: xcrun xcresulttool get test-results summary --path build/TestResults.xcresult
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Mac-test-results
+          path: build/TestResults.xcresult
+          retention-days: 7
       - name: Package local Release build
         run: ./scripts/build-local.sh
       - uses: actions/upload-artifact@v4
