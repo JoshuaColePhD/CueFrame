@@ -12,7 +12,7 @@ Requires **macOS 15.2 or later** and Xcode 16 or later to build. This version us
 git clone https://github.com/JoshuaColePhD/CueFrame.git
 cd CueFrame
 ./scripts/build-local.sh --install
-open "$HOME/Applications/Cueframe.app"
+open "/Applications/CueFrame.app"
 ```
 
 The script builds a locally signed Release app, verifies its signature, and creates `build/Cueframe-Mac.zip`. It remembers the selected local code-signing certificate in the ignored `build/signing-identity` file, or uses ad-hoc signing when none exists. No provisioning profile is needed for this personal build. It is not a notarized public distribution. Quit an older personal build before reinstalling. The original `com.easydemo` app has a different identifier and remains separate.
@@ -21,9 +21,9 @@ For reliable screen permissions across rebuilds, select the same stable code-sig
 
 Build output defaults to the system temporary directory to avoid cloud-file-provider Finder metadata interfering with signature verification. The ZIP stays in this workspace’s `build` folder. For a Debug build, set `CONFIGURATION=Debug`. Open `EasyDemo.xcodeproj` to work in Xcode. The installed Release identifier is `com.joshuacole.easydemo`; Debug/tests use `com.joshuacole.easydemo.debug` so development launches cannot replace the installed app’s privacy identity.
 
-Cueframe keeps this fork’s existing bundle identifiers, Keychain service, and recording storage path so the rename preserves permissions, projects, and preferences. The local installer upgrades an existing EasyDemo Personal installation and retains its old bundle under the ignored `build/previous-installations` folder.
+Cueframe keeps this fork’s existing bundle identifiers, Keychain service, and recording storage path so the rename preserves permissions, projects, and preferences. The local installer installs `/Applications/CueFrame.app`, upgrades an existing personal installation, and retains its old bundle under the ignored `build/previous-installations` folder.
 
-Cueframe uses the **Ribbon** logo: a folded play mark in lavender and mint on violet. Its editable vector is [assets/branding/Cueframe.svg](assets/branding/Cueframe.svg). Regenerate all macOS sizes with `swift scripts/generate-icon.swift`.
+Cueframe’s logo is a folded play mark in lavender and mint on violet. Its editable vector is [assets/branding/Cueframe.svg](assets/branding/Cueframe.svg). Regenerate all macOS sizes with `swift scripts/generate-icon.swift`.
 
 ## Record
 

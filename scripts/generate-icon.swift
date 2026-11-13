@@ -1,7 +1,7 @@
 #!/usr/bin/env swift
 import AppKit
 
-// Cueframe's selected Ribbon mark (concept 04).
+// Cueframe's selected mark (concept 04).
 // Run from the repository root to regenerate its SVG and every macOS icon size.
 // SVG and PNG outputs use the same paths and colors.
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -98,7 +98,7 @@ final class Canvas {
     }
 }
 
-func drawRibbon(_ c: Canvas) {
+func drawLogo(_ c: Canvas) {
         c.tile(["#9171F8", "#6944D4", "#43288E"])
         let left = CGMutablePath(); left.move(to: CGPoint(x: 346, y: 271))
         left.addCurve(to: CGPoint(x: 278, y: 339), control1: CGPoint(x: 303, y: 246), control2: CGPoint(x: 278, y: 270))
@@ -113,15 +113,15 @@ func drawRibbon(_ c: Canvas) {
         c.shape(polygon([.init(x: 407,y: 600),.init(x: 407,y: 694),.init(x: 350,y: 752)]), fill: "#BDA3ED")
 }
 let master = Canvas(size: 1024)
-drawRibbon(master)
+drawLogo(master)
 try master.png.write(to: root.appendingPathComponent("assets/AppIcon.png"))
-try Data(master.svg(title: "Ribbon").utf8).write(to: branding.appendingPathComponent("Cueframe.svg"))
+try Data(master.svg(title: "Folded play mark").utf8).write(to: branding.appendingPathComponent("Cueframe.svg"))
 let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: iconset.appendingPathComponent("Contents.json"))) as! [String: Any]
 for item in manifest["images"] as! [[String: String]] {
     let points = Int(item["size"]!.split(separator: "x")[0])!
     let scale = item["scale"] == "2x" ? 2 : 1
     let canvas = Canvas(size: points * scale)
-    drawRibbon(canvas)
+    drawLogo(canvas)
     try canvas.png.write(to: iconset.appendingPathComponent(item["filename"]!))
 }
-print("Generated Cueframe Ribbon SVG and all 10 macOS app icon renditions.")
+print("Generated Cueframe SVG and all 10 macOS app icon renditions.")

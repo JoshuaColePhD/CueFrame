@@ -26,15 +26,16 @@ if [[ "$signing_identity" == "-" ]]; then
 fi
 ditto -c -k --sequesterRsrc --keepParent "$app" "$project_root/build/Cueframe-Mac.zip"
 if [[ "${1:-}" == "--install" ]]; then
-  destination="$HOME/Applications/Cueframe.app"
-  mkdir -p "$HOME/Applications"
-  staging="$(mktemp -d "$HOME/Applications/.Cueframe-install.XXXXXX")"
+  install_dir="${CUEFRAME_INSTALL_DIR:-/Applications}"
+  destination="$install_dir/CueFrame.app"
+  mkdir -p "$install_dir"
+  staging="$(mktemp -d "$install_dir/.Cueframe-install.XXXXXX")"
   ditto "$app" "$staging/Cueframe.app"
   codesign --verify --deep --strict "$staging/Cueframe.app"
   previous="$destination"
-  if [[ ! -e "$previous" && -d "$HOME/Applications/EasyDemo Personal.app" ]]; then
-    previous="$HOME/Applications/EasyDemo Personal.app"
-  fi
+  for legacy in "$HOME/Applications/Cueframe.app" "$HOME/Applications/EasyDemo Personal.app"; do
+    if [[ ! -e "$previous" && -d "$legacy" ]]; then previous="$legacy"; fi
+  done
   backup=""
   if [[ -e "$previous" ]]; then
     expected_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
