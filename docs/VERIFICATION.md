@@ -4,6 +4,7 @@ Verified on the user's Apple Silicon Mac with macOS 27.2.1 and Xcode 27.2. The a
 
 ## Completed
 
+- The user selected the **Ribbon** logo (concept 04). All ten production icon sizes were regenerated from its vector geometry, and the 1024 px master exactly matches the chosen concept. The repository is now [JoshuaColePhD/CueFrame](https://github.com/JoshuaColePhD/CueFrame), retaining its fork history and MIT attribution. App build 2 refreshes the installed icon and points Help/About links to the renamed repository.
 - The Cueframe branding upgrade built Debug and signed Release successfully and passed all 17 tests. All ten macOS icon sizes were verified. Relaunch showed the new app name, menus, and About icon; the existing recording library, granted input permissions, and C920/squircle preferences remained available. The installer retained the prior app bundle in the ignored build backup folder.
 - Debug build and all **17 logic, media, transport, and startup tests** passed. The suite includes permission denial and late permission cancellation, missing credentials, malformed/refused AI responses, HTTP 401, interrupted requests, conservative pause detection, settings/project persistence, safe export failure and original-file protection.
 - Release build, local certificate signing, strict signature verification, ZIP packaging, installation, and application launch succeeded. Debug uses a separate bundle identifier to protect the installed app's privacy identity.

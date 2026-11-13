@@ -13,7 +13,7 @@ struct AboutView: View {
     @Environment(\.colorScheme)
     private var colorScheme
 
-    private let githubURL = "https://github.com/JoshuaColePhD/EasyDemo"
+    private let githubURL = "https://github.com/JoshuaColePhD/CueFrame"
     private let iconSize: CGFloat = 128
     private let iconCornerRadius: CGFloat = 28
     private let windowSize = CGSize(width: 500, height: 520)

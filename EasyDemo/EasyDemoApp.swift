@@ -14,7 +14,7 @@ struct EasyDemoApp: App {
 
     // MARK: - Constants
 
-    private let githubURL = "https://github.com/JoshuaColePhD/EasyDemo"
+    private let githubURL = "https://github.com/JoshuaColePhD/CueFrame"
 
     // MARK: - Body
 

@@ -9,6 +9,8 @@ Requires **macOS 15.2 or later** and Xcode 16 or later to build. This version us
 ## Build and install
 
 ```sh
+git clone https://github.com/JoshuaColePhD/CueFrame.git
+cd CueFrame
 ./scripts/build-local.sh --install
 open "$HOME/Applications/Cueframe.app"
 ```
@@ -21,7 +23,7 @@ Build output defaults to the system temporary directory to avoid cloud-file-prov
 
 Cueframe keeps this fork’s existing bundle identifiers, Keychain service, and recording storage path so the rename preserves permissions, projects, and preferences. The local installer upgrades an existing EasyDemo Personal installation and retains its old bundle under the ignored `build/previous-installations` folder.
 
-The new icon’s editable vector is [assets/branding/Cueframe.svg](assets/branding/Cueframe.svg). Regenerate all macOS sizes with `swift scripts/generate-icon.swift`.
+Cueframe uses the **Ribbon** logo: a folded play mark in lavender and mint on violet. Its editable vector is [assets/branding/Cueframe.svg](assets/branding/Cueframe.svg). Regenerate all macOS sizes with `swift scripts/generate-icon.swift`.
 
 ## Record
 
