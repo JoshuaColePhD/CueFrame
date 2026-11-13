@@ -15,7 +15,8 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: macos-15
+    # Also verifies Intel compatibility; Apple Silicon capture is tested locally.
+    runs-on: macos-15-intel
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
