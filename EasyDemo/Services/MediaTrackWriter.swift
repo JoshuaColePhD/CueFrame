@@ -9,6 +9,7 @@ final class MediaTrackWriter {
     private var lastTime = CMTime.invalid
     private var lastVideoSample: CMSampleBuffer?
     private var lastAudioEnd = CMTime.invalid
+    var isReadyForMoreMediaData: Bool { input?.isReadyForMoreMediaData ?? true }
 
     init(url: URL) throws {
         self.url = url

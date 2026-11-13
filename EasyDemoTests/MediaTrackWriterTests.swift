@@ -20,6 +20,13 @@ struct MediaTrackWriterTests {
         // Audio is continuous, like a real microphone; the screen stays idle after its first frame.
         let template = try audioSample(at: origin + ProjectRenderer.time(0.1))
         for offset in stride(from: 0.1, to: 600, by: 1) {
+            // This fixture produces ten minutes of audio faster than a live input.
+            // Do not interpret offline encoder pressure as a hardware capture failure.
+            let deadline = Date().addingTimeInterval(10)
+            while !audio.isReadyForMoreMediaData {
+                try #require(Date() < deadline, "The synthetic audio encoder did not become ready.")
+                try await Task.sleep(for: .milliseconds(2))
+            }
             var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 48000),
                 presentationTimeStamp: origin + ProjectRenderer.time(offset), decodeTimeStamp: .invalid)
             var sample: CMSampleBuffer?
