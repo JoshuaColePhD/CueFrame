@@ -42,7 +42,7 @@ struct WelcomePage: View, OnboardingPageContent {
             }
 
             VStack(spacing: UIConstants.Onboarding.sectionSpacing) {
-                Text("Welcome to EasyDemo")
+                Text("Welcome to Cueframe")
                     .font(.system(size: UIConstants.Typography.welcomeTitleSize, weight: .bold))
                     .foregroundColor(.primary)
 
@@ -341,7 +341,7 @@ struct FeatureRow: View {
             PermissionsPage(
                 icon: "video.badge.checkmark",
                 title: "Screen Recording",
-                description: "EasyDemo needs permission to capture your screen.",
+                description: "Cueframe needs permission to capture your screen.",
                 permissionGranted: $granted
             )
         }

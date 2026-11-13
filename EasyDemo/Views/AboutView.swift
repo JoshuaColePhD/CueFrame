@@ -13,7 +13,7 @@ struct AboutView: View {
     @Environment(\.colorScheme)
     private var colorScheme
 
-    private let githubURL = "https://github.com/danieloquelis/EasyDemo"
+    private let githubURL = "https://github.com/JoshuaColePhD/CueFrame"
     private let iconSize: CGFloat = 128
     private let iconCornerRadius: CGFloat = 28
     private let windowSize = CGSize(width: 500, height: 520)
@@ -71,7 +71,7 @@ struct AboutView: View {
             appIconView
                 .padding(.top, 40)
 
-            Text("EasyDemo")
+            Text("Cueframe")
                 .font(.system(size: 32, weight: .semibold))
                 .foregroundColor(primaryTextColor)
 
@@ -122,13 +122,13 @@ struct AboutView: View {
                 .foregroundColor(.secondary)
 
             VStack(spacing: 8) {
-                Text("A free, open-source screen recorder for macOS.")
+                Text("Screen, voice, and camera. Framed together.")
                     .descriptionText(color: descriptionTextColor)
 
-                Text("Professional-quality recordings shouldn't be behind a paywall.")
+                Text("A personal Mac recorder with editable zooms.")
                     .descriptionText(color: descriptionTextColor)
 
-                Text("For those who want a quick styled screen recording.")
+                Text("Based on Daniel Oquelis’s EasyDemo, under the MIT license.")
                     .descriptionText(color: descriptionTextColor)
             }
             .padding(.horizontal, 40)

@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-struct WebcamConfiguration: Codable {
+struct WebcamConfiguration: Codable, Equatable {
     var isEnabled: Bool
     var shape: Shape
     var position: Position
@@ -62,8 +62,8 @@ struct WebcamConfiguration: Codable {
     }
 
     static let `default` = WebcamConfiguration(
-        isEnabled: false,
-        shape: .circle,
+        isEnabled: true,
+        shape: .squircle,
         position: .bottomLeft,
         size: UIConstants.Size.webcamDefault,
         selectedDeviceId: nil,

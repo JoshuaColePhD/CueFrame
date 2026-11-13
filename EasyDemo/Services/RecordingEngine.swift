@@ -1,393 +1,159 @@
-import Foundation
-import ScreenCaptureKit
+import AppKit
 import AVFoundation
-import CoreMedia
 import Combine
 
 @MainActor
-class RecordingEngine: NSObject, ObservableObject, SCStreamOutput {
+final class RecordingEngine: ObservableObject {
     static let shared = RecordingEngine()
-
-    @Published var isRecording = false
-    @Published var recordingDuration: TimeInterval = 0
+    enum Phase: String { case idle, starting, recording, stopping }
+    @Published private(set) var phase: Phase = .idle
+    @Published private(set) var isRecording = false
+    @Published private(set) var recordingDuration = 0.0
     @Published var error: Error?
     @Published var lastRecordingResult: RecordingResult?
+    @Published private(set) var startupStatus = "Starting capture…"
+    private var preparationID: UUID?
+    var canCancelStartup: Bool { phase == .starting && capture == nil }
+    private var capture: CaptureSession?
+    private var project: RecordingProject?
+    private var timer: Timer?
+    private var cursor: [CursorSample] = []
+    private var monitor: Any?
+    private var localMonitor: Any?
+    private var source: CaptureSource?
+    private var lastCursor: CGPoint?
+    private let screenAllowed: () -> Bool
+    private let requestAccess: (AVMediaType) async -> Bool
 
-    private var stream: SCStream?
-    private var assetWriter: AVAssetWriter?
-    private var videoInput: AVAssetWriterInput?
-    private var audioInput: AVAssetWriterInput?
-    private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
-
-    private var configuration: RecordingConfiguration?
-    private var startTime: CMTime?
-    private var frameCount: Int64 = 0
-    private var audioSampleCount: Int64 = 0
-    private var durationTimer: Timer?
-    private var captureScaleFactor: CGFloat = 2.0
-    private var targetOutputSize: CGSize = .zero
-
-    private let videoComposer = VideoComposer()
-    private var webcamCapture: WebcamCapture?
-    private var audioCapture: AudioCaptureService?
-    private var outputDirectoryManager: OutputDirectoryManager?
+    init(screenAllowed: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
+         requestAccess: @escaping (AVMediaType) async -> Bool = { await AVCaptureDevice.requestAccess(for: $0) }) {
+        self.screenAllowed = screenAllowed; self.requestAccess = requestAccess
+    }
 
     func startRecording(configuration: RecordingConfiguration, outputDirectoryManager: OutputDirectoryManager? = nil) async throws {
-        guard !isRecording else { return }
-
-        self.configuration = configuration
-        self.outputDirectoryManager = outputDirectoryManager
-        self.isRecording = true
-        self.frameCount = 0
-        self.audioSampleCount = 0
-        self.startTime = nil
-        self.recordingDuration = 0
-        
-        // Start accessing security-scoped resource if using custom output directory
-        if let manager = outputDirectoryManager, manager.customOutputDirectory != nil {
-            _ = manager.startAccessing()
-        }
-
-        let content = try await SCShareableContent.current
-        let filter: SCContentFilter
-
-        switch configuration.source {
-        case .window(let windowInfo):
-            guard let scWindow = content.windows.first(where: { $0.windowID == windowInfo.id }) else {
-                throw RecordingError.windowNotFound
+        guard phase == .idle else { return }
+        let attempt = UUID(); preparationID = attempt
+        phase = .starting; isRecording = true; error = nil; recordingDuration = 0; cursor = []; lastCursor = nil
+        do {
+            guard configuration.authorizedFilter != nil || screenAllowed() else {
+                throw EditingError.media("Choose a window or display in the macOS sharing picker before recording.")
             }
-            filter = SCContentFilter(desktopIndependentWindow: scWindow)
-
-        case .display(let displayInfo):
-            guard let scDisplay = content.displays.first(where: { $0.displayID == displayInfo.id }) else {
-                throw RecordingError.displayNotFound
+            if configuration.audio.microphoneEnabled {
+                startupStatus = "Waiting for macOS microphone permission…"
+                let granted = await requestAccess(.audio)
+                guard preparationID == attempt else { throw CancellationError() }
+                guard granted else { throw EditingError.media("Microphone access is denied. Grant access or turn off the microphone before recording.") }
             }
-            filter = SCContentFilter(display: scDisplay, excludingWindows: [])
-        }
-
-        self.captureScaleFactor = CGFloat(filter.pointPixelScale)
-
-        // Setup asset writer
-        try setupAssetWriter(configuration: configuration)
-
-        // Set startTime right before captures begin to minimize offset
-        self.startTime = CMTime(seconds: CACurrentMediaTime(), preferredTimescale: 600)
-
-        // Start microphone/audio capture if enabled
-        if configuration.audio.microphoneEnabled {
-            let audioService = AudioCaptureService()
-            try await audioService.startCapture(
-                configuration: configuration.audio,
-                sessionStartTime: self.startTime
-            ) { [weak self] sampleBuffer in
-                guard let self = self else { return }
-                self.processAudioSample(sampleBuffer)
+            if configuration.webcam.isEnabled {
+                startupStatus = "Waiting for macOS camera permission…"
+                let granted = await requestAccess(.video)
+                guard preparationID == attempt else { throw CancellationError() }
+                guard granted else { throw EditingError.media("Camera access is denied. Grant access or turn off the overlay before recording.") }
             }
-            self.audioCapture = audioService
+            WebcamCapture.stopAllCaptures()
+            let folder = RecordingProject.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let dimensions = configuration.resolution.dimensions ?? CGSize(width: 1920, height: 1080)
+            var background = SavedBackground(configuration.background)
+            if case .image(let url) = configuration.background {
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                let local = folder.appendingPathComponent("background.\(url.pathExtension.isEmpty ? "jpg" : url.pathExtension)")
+                try FileManager.default.copyItem(at: url, to: local)
+                background = SavedBackground(.image(local))
+            }
+            var value = RecordingProject(title: configuration.source.displayName,
+                webcam: configuration.webcam, microphoneVolume: configuration.audio.microphoneVolume,
+                background: background, windowScale: configuration.windowScale,
+                width: Int(dimensions.width), height: Int(dimensions.height), frameRate: configuration.frameRate, codec: configuration.codec)
+            value.folder = folder
+            value.cameraFile = configuration.webcam.isEnabled ? "camera.mov" : nil
+            value.microphoneFile = configuration.audio.microphoneEnabled ? "microphone.mov" : nil
+            value.systemAudioFile = configuration.audio.systemAudioEnabled ? "system.mov" : nil
+            project = value; try value.save()
+            let session = CaptureSession(configuration: configuration, folder: folder)
+            session.onFailure = { [weak self] message in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.error = EditingError.media(message)
+                    if self.phase == .recording { _ = await self.stopRecording() }
+                }
+            }
+            capture = session; source = configuration.source
+            startupStatus = "Starting capture…"
+            try await session.start()
+            if configuration.resolution == .original {
+                value.width = Int(session.dimensions.width); value.height = Int(session.dimensions.height)
+                project = value; try value.save()
+            }
+            phase = .recording
+            let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .mouseMoved, .leftMouseDragged, .scrollWheel]
+            monitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in self?.observeCursor(event) }
+            localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in self?.observeCursor(event); return event }
+            timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.recordingDuration = self?.capture?.elapsed() ?? 0 }
+            }
+            StatusBarManager.shared.show()
+        } catch {
+            guard preparationID == attempt else { throw CancellationError() }
+            if let capture { _ = await capture.stop() }
+            project?.state = "failed"; project?.failure = error.localizedDescription; try? project?.save()
+            cleanup(); self.error = error; throw error
         }
+    }
 
-        // Start video stream
-        try await setupStream(configuration: configuration, filter: filter)
-
-        // Start webcam if enabled
-        if configuration.webcam.isEnabled {
-            let webcam = WebcamCapture()
-            try await webcam.startCapture(deviceId: configuration.webcam.selectedDeviceId)
-            self.webcamCapture = webcam
+    private func observeCursor(_ event: NSEvent) {
+        guard let source, let capture, phase == .recording else { return }
+        let mouse = NSEvent.mouseLocation
+        let mainHeight = NSScreen.screens.first?.frame.height ?? 0
+        let point = CGPoint(x: mouse.x, y: mainHeight - mouse.y)
+        let bounds: CGRect
+        switch source {
+        case .display(let info): bounds = CGDisplayBounds(info.id)
+        case .window(let info):
+            guard let data = CGWindowListCopyWindowInfo(.optionIncludingWindow, info.id) as? [[String: Any]],
+                  let dictionary = data.first?[kCGWindowBounds as String] as? [String: Any],
+                  let current = CGRect(dictionaryRepresentation: dictionary as CFDictionary) else { return }
+            bounds = current
         }
-
-        durationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, let startTime = self.startTime else { return }
-            let currentTime = CMTime(seconds: CACurrentMediaTime(), preferredTimescale: 600)
-            self.recordingDuration = CMTimeGetSeconds(CMTimeSubtract(currentTime, startTime))
-        }
-
-        StatusBarManager.shared.show()
+        guard bounds.contains(point), bounds.width > 0, bounds.height > 0 else { return }
+        let clicked = event.type == .leftMouseDown || event.type == .rightMouseDown
+        if let lastCursor, !clicked, hypot(lastCursor.x - point.x, lastCursor.y - point.y) < 3 { return }
+        let now = capture.elapsed()
+        if !clicked, let last = cursor.last, now - last.time < 0.1 { return }
+        cursor.append(CursorSample(time: now, x: (point.x - bounds.minX) / bounds.width,
+                                   y: (point.y - bounds.minY) / bounds.height, clicked: clicked))
+        lastCursor = point
     }
 
     func stopRecording() async -> RecordingResult? {
-        guard isRecording else { return nil }
-
-        let finalDuration = recordingDuration
-        let outputURL = configuration?.outputURL
-
-        durationTimer?.invalidate()
-        durationTimer = nil
-
-        webcamCapture?.stopCapture()
-        webcamCapture = nil
-
-        audioCapture?.stopCapture()
-        audioCapture = nil
-
-        if let stream = stream {
-            try? await stream.stopCapture()
-        }
-
-        if let videoInput = videoInput {
-            videoInput.markAsFinished()
-        }
-
-        if let audioInput = audioInput {
-            audioInput.markAsFinished()
-        }
-
-        if let assetWriter = assetWriter {
-            await assetWriter.finishWriting()
-        }
-
+        guard phase == .recording, let capture, var value = project else { return nil }
+        phase = .stopping; timer?.invalidate(); timer = nil
+        if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil
+        if let localMonitor { NSEvent.removeMonitor(localMonitor) }; localMonitor = nil
+        let (duration, activity, failure) = await capture.stop()
+        value.duration = duration; value.activity = activity; value.cursor = cursor
+        value.failure = failure; value.state = failure == nil ? "complete" : "interrupted"
+        do { try value.save() } catch { self.error = error }
+        if let failure { error = EditingError.media(failure) }
+        let screen = value.folder.appendingPathComponent(value.screenFile)
+        let size = (try? screen.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        let result = RecordingResult(fileURL: screen, duration: duration, fileSize: Int64(size),
+                                     timestamp: value.created, projectFolder: value.folder)
+        lastRecordingResult = result
         cleanup()
-
-        guard let url = outputURL else { return nil }
-
-        try? await Task.sleep(nanoseconds: 500_000_000)
-
-        let fileSize = getFileSize(at: url)
-
-        let result = RecordingResult(
-            fileURL: url,
-            duration: finalDuration,
-            fileSize: fileSize,
-            timestamp: Date()
-        )
-        self.lastRecordingResult = result
         return result
     }
 
     private func cleanup() {
-        // Stop accessing security-scoped resource
-        outputDirectoryManager?.stopAccessing()
-
-        self.stream = nil
-        self.assetWriter = nil
-        self.videoInput = nil
-        self.audioInput = nil
-        self.pixelBufferAdaptor = nil
-        self.startTime = nil
-        self.isRecording = false
-        self.outputDirectoryManager = nil
-
-        StatusBarManager.shared.hide()
+        timer?.invalidate(); timer = nil; capture = nil; project = nil; source = nil
+        phase = .idle; isRecording = false; StatusBarManager.shared.hide()
+        preparationID = nil
     }
 
-    private func getFileSize(at url: URL) -> Int64 {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let size = attributes[.size] as? Int64 else {
-            return 0
-        }
-        return size
-    }
-
-    private func setupAssetWriter(configuration: RecordingConfiguration) throws {
-        let writer = try AVAssetWriter(url: configuration.outputURL, fileType: .mov)
-
-        let outputSize = calculateOutputSize(configuration: configuration)
-        self.targetOutputSize = outputSize
-
-        let videoSettings = createVideoSettings(
-            outputSize: outputSize,
-            frameRate: configuration.frameRate,
-            codec: configuration.codec
-        )
-
-        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
-        videoInput.expectsMediaDataInRealTime = true
-
-        let pixelBufferAttributes: [String: Any] = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey as String: Int(outputSize.width),
-            kCVPixelBufferHeightKey as String: Int(outputSize.height),
-            kCVPixelBufferMetalCompatibilityKey as String: true
-        ]
-
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-            assetWriterInput: videoInput,
-            sourcePixelBufferAttributes: pixelBufferAttributes
-        )
-
-        guard writer.canAdd(videoInput) else {
-            throw RecordingError.cannotAddVideoInput
-        }
-
-        writer.add(videoInput)
-
-        // Add audio input if enabled
-        if configuration.audio.microphoneEnabled {
-            let audioSettings = createAudioSettings(quality: configuration.audio.quality)
-            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
-            audioInput.expectsMediaDataInRealTime = true
-
-            if writer.canAdd(audioInput) {
-                writer.add(audioInput)
-                self.audioInput = audioInput
-            }
-        }
-
-        self.assetWriter = writer
-        self.videoInput = videoInput
-        self.pixelBufferAdaptor = adaptor
-
-        writer.startWriting()
-        // Start session at time zero - samples will have timestamps relative to this
-        writer.startSession(atSourceTime: .zero)
-        // startTime is set later in startRecording(), right before captures begin
-    }
-
-    private func calculateOutputSize(configuration: RecordingConfiguration) -> CGSize {
-        if let resolution = configuration.resolution.dimensions {
-            return resolution
-        }
-
-        let sourceBounds = configuration.source.bounds
-
-        let windowPixelWidth = sourceBounds.width * captureScaleFactor
-        let windowPixelHeight = sourceBounds.height * captureScaleFactor
-        let marginInPixels = UIConstants.Padding.minimum * 2 * captureScaleFactor
-
-        return CGSize(
-            width: windowPixelWidth + marginInPixels,
-            height: windowPixelHeight + marginInPixels
-        )
-    }
-
-    private func createVideoSettings(
-        outputSize: CGSize,
-        frameRate: Int,
-        codec: RecordingConfiguration.VideoCodec
-    ) -> [String: Any] {
-        let pixelCount = outputSize.width * outputSize.height
-        let is4K = pixelCount >= VideoConstants.Resolution.uhd4k.width * VideoConstants.Resolution.uhd4k.height * 0.9
-        let bitsPerPixel: CGFloat = is4K ? VideoConstants.Bitrate.bitsPerPixel4K : VideoConstants.Bitrate.bitsPerPixelHD
-        let targetBitrate = Int(pixelCount * bitsPerPixel * CGFloat(frameRate))
-
-        return [
-            AVVideoCodecKey: codec.avCodecType,
-            AVVideoWidthKey: Int(outputSize.width),
-            AVVideoHeightKey: Int(outputSize.height),
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: max(targetBitrate, VideoConstants.Bitrate.minimum),
-                AVVideoMaxKeyFrameIntervalKey: frameRate * 2,
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                AVVideoExpectedSourceFrameRateKey: frameRate,
-                AVVideoQualityKey: 0.9
-            ]
-        ]
-    }
-
-    private func createAudioSettings(quality: AudioConfiguration.AudioQuality) -> [String: Any] {
-        // Create audio channel layout
-        var channelLayout = AudioChannelLayout()
-        channelLayout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
-        channelLayout.mChannelBitmap = AudioChannelBitmap()
-        channelLayout.mNumberChannelDescriptions = 0
-
-        let channelLayoutData = Data(bytes: &channelLayout, count: MemoryLayout<AudioChannelLayout>.size)
-
-        // Important: Match the sample rate with incoming audio (48kHz)
-        return [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 48000.0,  // Match input sample rate
-            AVNumberOfChannelsKey: 2,
-            AVChannelLayoutKey: channelLayoutData,
-            AVEncoderBitRateKey: quality.bitrate
-        ]
-    }
-
-    private func setupStream(configuration: RecordingConfiguration, filter: SCContentFilter) async throws {
-        let streamConfig = SCStreamConfiguration()
-        streamConfig.width = Int(filter.contentRect.width * CGFloat(filter.pointPixelScale))
-        streamConfig.height = Int(filter.contentRect.height * CGFloat(filter.pointPixelScale))
-        streamConfig.pixelFormat = kCVPixelFormatType_32BGRA
-        streamConfig.showsCursor = true
-        streamConfig.captureResolution = .best
-        streamConfig.scalesToFit = false
-        streamConfig.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(configuration.frameRate))
-
-        let stream = SCStream(filter: filter, configuration: streamConfig, delegate: nil)
-        try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
-
-        self.stream = stream
-        try await stream.startCapture()
-    }
-
-    func stream(
-        _ stream: SCStream,
-        didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
-        of type: SCStreamOutputType
-    ) {
-        switch type {
-        case .screen:
-            handleVideoSample(sampleBuffer)
-        case .audio, .microphone:
-            // Audio is handled by AudioCaptureService
-            break
-        @unknown default:
-            break
-        }
-    }
-
-    private func handleVideoSample(_ sampleBuffer: CMSampleBuffer) {
-        guard let configuration = configuration,
-              let videoInput = videoInput,
-              let adaptor = pixelBufferAdaptor,
-              videoInput.isReadyForMoreMediaData,
-              let imageBuffer = sampleBuffer.imageBuffer else {
-            return
-        }
-
-        // Capture timestamp BEFORE composition to avoid drift from processing time
-        let currentTime = CMTime(seconds: CACurrentMediaTime(), preferredTimescale: 600)
-        let presentationTime: CMTime
-
-        if let startTime = startTime {
-            presentationTime = CMTimeSubtract(currentTime, startTime)
-        } else {
-            presentationTime = .zero
-        }
-
-        let composedBuffer = videoComposer.composeFrame(
-            windowBuffer: imageBuffer,
-            configuration: configuration,
-            targetOutputSize: targetOutputSize,
-            scaleFactor: captureScaleFactor,
-            webcamFrame: webcamCapture?.currentFrame,
-            frameCount: frameCount
-        )
-
-        if let buffer = composedBuffer {
-            adaptor.append(buffer, withPresentationTime: presentationTime)
-            frameCount += 1
-        }
-    }
-
-
-    nonisolated private func processAudioSample(_ sampleBuffer: CMSampleBuffer) {
-        Task { @MainActor in
-            guard let audioInput = self.audioInput,
-                  audioInput.isReadyForMoreMediaData else {
-                return
-            }
-
-            // Append the audio sample (already has correct timestamp from AudioCaptureService)
-            audioInput.append(sampleBuffer)
-            self.audioSampleCount += 1
-        }
-    }
-
-    enum RecordingError: LocalizedError {
-        case cannotAddVideoInput
-        case windowNotFound
-        case displayNotFound
-
-        var errorDescription: String? {
-            switch self {
-            case .cannotAddVideoInput:
-                return "Failed to add video input to asset writer"
-            case .windowNotFound:
-                return "Selected window not found"
-            case .displayNotFound:
-                return "Selected display not found"
-            }
-        }
+    func cancelStartup() {
+        guard canCancelStartup else { return }
+        preparationID = nil
+        cleanup()
     }
 }

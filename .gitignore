@@ -60,3 +60,8 @@ PRODUCT_VISION.md
 INSTRUCTIONS.md
 CLAUDE.md
 .claude/*
+# Local credentials and recordings
+.env
+.env.*
+Recordings/
+*.caf

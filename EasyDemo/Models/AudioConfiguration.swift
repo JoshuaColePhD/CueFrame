@@ -8,7 +8,8 @@ import Foundation
 import AVFoundation
 
 /// Configuration for audio capture during recording
-struct AudioConfiguration: Equatable {
+struct AudioConfiguration: Equatable, Codable {
+    var systemAudioEnabled = false
     /// Whether microphone audio is enabled
     var microphoneEnabled: Bool
 
@@ -22,13 +23,14 @@ struct AudioConfiguration: Equatable {
     var quality: AudioQuality
 
     static func == (lhs: AudioConfiguration, rhs: AudioConfiguration) -> Bool {
+        lhs.systemAudioEnabled == rhs.systemAudioEnabled &&
         lhs.microphoneEnabled == rhs.microphoneEnabled &&
         lhs.selectedMicrophoneDeviceID == rhs.selectedMicrophoneDeviceID &&
         lhs.microphoneVolume == rhs.microphoneVolume &&
         lhs.quality == rhs.quality
     }
 
-    enum AudioQuality: String, CaseIterable, Identifiable {
+    enum AudioQuality: String, Codable, CaseIterable, Identifiable {
         case standard = "Standard (128 kbps)"
         case high = "High (192 kbps)"
         case lossless = "Lossless (256 kbps)"
@@ -53,12 +55,12 @@ struct AudioConfiguration: Equatable {
 
     /// Whether any audio is enabled
     var isEnabled: Bool {
-        microphoneEnabled
+        microphoneEnabled || systemAudioEnabled
     }
 
     static var `default`: AudioConfiguration {
         AudioConfiguration(
-            microphoneEnabled: false,
+            microphoneEnabled: true,
             selectedMicrophoneDeviceID: nil,
             microphoneVolume: 1.0,
             quality: .high

@@ -14,7 +14,7 @@ struct EasyDemoApp: App {
 
     // MARK: - Constants
 
-    private let githubURL = "https://github.com/danieloquelis/EasyDemo"
+    private let githubURL = "https://github.com/JoshuaColePhD/CueFrame"
 
     // MARK: - Body
 
@@ -27,13 +27,14 @@ struct EasyDemoApp: App {
             configureAppInfoMenu()
             configureHelpMenu()
         }
+        Settings { AISettingsView() }
     }
 
     // MARK: - Menu Configuration
 
     private func configureAppInfoMenu() -> some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button("About EasyDemo") {
+            Button("About Cueframe") {
                 AboutWindowController.shared.showAboutWindow()
             }
         }
@@ -55,16 +56,19 @@ struct EasyDemoApp: App {
 
 // MARK: - AppDelegate
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationWillTerminate(_ notification: Notification) {
-        // Stop all active webcam captures when app terminates
-        // This ensures the camera indicator light turns off immediately
-        Task { @MainActor in
-            WebcamCapture.stopAllCaptures()
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if RecordingEngine.shared.phase == .recording {
+            Task { @MainActor in
+                _ = await RecordingEngine.shared.stopRecording()
+                sender.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
         }
-
-        // Give the system a brief moment to release resources
-        Thread.sleep(forTimeInterval: 0.15)
+        if RecordingEngine.shared.isRecording { return .terminateCancel }
+        WebcamCapture.stopAllCaptures()
+        return .terminateNow
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

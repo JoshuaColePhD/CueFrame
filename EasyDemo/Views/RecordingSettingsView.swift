@@ -136,7 +136,7 @@ struct RecordingSettingsView: View {
     private func resolutionDescription(for resolution: RecordingConfiguration.Resolution) -> String {
         switch resolution {
         case .original:
-            return "Native Retina quality"
+            return "Capture-size canvas, up to 4K"
         case .hd1080:
             return "Full HD, standard quality"
         case .hd1440:
@@ -149,7 +149,7 @@ struct RecordingSettingsView: View {
     private func resolutionDetailedDescription(for resolution: RecordingConfiguration.Resolution) -> String {
         switch resolution {
         case .original:
-            return "📱 Records at your screen's native resolution. Best quality-to-filesize ratio. Perfect for most use cases."
+            return "Uses the captured source dimensions, up to 4K, with your chosen background and screen framing."
         case .hd1080:
             return "🎬 1920×1080 - Standard for YouTube and web. Universal compatibility, smaller files."
         case .hd1440:

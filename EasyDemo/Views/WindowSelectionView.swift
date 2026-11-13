@@ -47,7 +47,7 @@ struct WindowSelectionView: View {
                     Text("Screen Recording Permission Required")
                         .font(.headline)
 
-                    Text("Grant screen recording permission in System Settings. On macOS, you may need to quit and reopen EasyDemo before sources appear.")
+                    Text("Grant screen recording permission in System Settings. On macOS, you may need to quit and reopen Cueframe before sources appear.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)

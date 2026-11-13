@@ -1,194 +1,54 @@
-//
-//  AudioSettingsView.swift
-//  EasyDemo
-//
-//  Created by Daniel Oquelis
-
 import SwiftUI
 import AVFoundation
 
-/// View for configuring audio recording settings
 struct AudioSettingsView: View {
     @Binding var configuration: AudioConfiguration
-    @StateObject private var audioService = AudioCaptureService()
-    @State private var showPermissionAlert = false
-    @State private var permissionError: String?
-    @State private var availableMicrophones: [AVCaptureDevice] = []
+    @StateObject private var meter = AudioCaptureService()
+    @ObservedObject private var engine = RecordingEngine.shared
+    @State private var microphones: [AVCaptureDevice] = []
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Microphone Section
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle("Record Microphone", isOn: $configuration.microphoneEnabled)
-                    .font(.headline)
-                    .onChange(of: configuration.microphoneEnabled) { _, newValue in
-                        if newValue {
-                            Task {
-                                let hasPermission = await audioService.requestMicrophonePermission()
-                                if !hasPermission {
-                                    await MainActor.run {
-                                        configuration.microphoneEnabled = false
-                                        permissionError = "Microphone permission denied"
-                                        showPermissionAlert = true
-                                    }
-                                }
-                            }
-                        }
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("Record microphone", isOn: $configuration.microphoneEnabled)
+            if configuration.microphoneEnabled {
+                Picker("Microphone", selection: Binding(get: { configuration.selectedMicrophoneDeviceID ?? "" }, set: { configuration.selectedMicrophoneDeviceID = $0.isEmpty ? nil : $0 })) {
+                    Text("System default").tag("")
+                    ForEach(microphones, id: \.uniqueID) { Text($0.localizedName).tag($0.uniqueID) }
+                    if let id = configuration.selectedMicrophoneDeviceID, !microphones.contains(where: { $0.uniqueID == id }) {
+                        Text("Disconnected microphone").tag(id)
                     }
-
-                if configuration.microphoneEnabled {
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Microphone device picker
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Input Device")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-
-                            Picker("Microphone", selection: Binding(
-                                get: { configuration.selectedMicrophoneDeviceID ?? "" },
-                                set: { newValue in
-                                    configuration.selectedMicrophoneDeviceID = newValue.isEmpty ? nil : newValue
-                                }
-                            )) {
-                                Text("Default")
-                                    .tag("")
-                                ForEach(availableMicrophones, id: \.uniqueID) { device in
-                                    Text(device.localizedName)
-                                        .lineLimit(1)
-                                        .tag(device.uniqueID)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                        }
-
-                        // Volume slider
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Volume")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text("\(Int(configuration.microphoneVolume * 100))%")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Slider(value: $configuration.microphoneVolume, in: 0.0...1.0, step: 0.05)
-                        }
-                    }
-                    .padding(.leading, 20)
                 }
+                if meter.hasPermission {
+                    ProgressView(value: meter.level)
+                        .accessibilityLabel("Microphone input level")
+                    Text(meter.isCapturing ? "Microphone meter is listening" : "Microphone permission granted")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Button("Allow microphone and check level") {
+                        Task { if await meter.requestMicrophonePermission() { await refresh() } }
+                    }
+                    Text("Microphone access is required for narration.").font(.caption).foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Voice volume")
+                    Slider(value: $configuration.microphoneVolume, in: 0...1)
+                        .accessibilityLabel("Voice volume")
+                }
+                if let error = meter.error { Text(error).font(.caption).foregroundStyle(.orange) }
             }
-
-
-            if configuration.isEnabled {
-                Divider()
-
-                // Audio Quality Picker
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Audio Quality")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Picker("Quality", selection: $configuration.quality) {
-                        ForEach(AudioConfiguration.AudioQuality.allCases) { quality in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(quality.rawValue)
-                                    .font(.body)
-                                Text(qualityDescription(for: quality))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .tag(quality)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Text(qualityDetailedDescription(for: configuration.quality))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .lineLimit(nil)
-                        .padding(8)
-                        .background(Color(.controlBackgroundColor))
-                        .cornerRadius(6)
-                }
-
-                // Pro tip
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(.yellow)
-                        .font(.caption)
-                        .frame(width: 12, height: 12)
-                        .padding(.top, 2)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Pro Tip")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                        Text(getProTip())
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .lineLimit(nil)
-                    }
-                }
-                .padding(8)
-                .background(Color(.controlBackgroundColor).opacity(0.5))
-                .cornerRadius(6)
-            }
+            Toggle("Record Mac audio", isOn: $configuration.systemAudioEnabled)
+            Text("Mac audio follows the selected capture source. Use headphones to avoid recording speaker sound twice.")
+                .font(.caption).foregroundStyle(.secondary)
         }
-        .onAppear {
-            // Load available microphones
-            availableMicrophones = audioService.getAvailableMicrophones()
-        }
-        .alert("Microphone Permission Required", isPresented: $showPermissionAlert) {
-            Button("Open System Settings") {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Please grant microphone permission in System Settings > Privacy & Security > Microphone to record audio.\n\nError: \(permissionError ?? "Unknown")")
-        }
+        .task { await refresh() }
+        .onChange(of: configuration.selectedMicrophoneDeviceID) { Task { await refresh() } }
+        .onChange(of: configuration.microphoneEnabled) { Task { await refresh() } }
+        .onChange(of: engine.isRecording) { Task { await refresh() } }
+        .onDisappear { meter.stopCapture() }
     }
-
-    // MARK: - Helper Functions
-
-    private func qualityDescription(for quality: AudioConfiguration.AudioQuality) -> String {
-        switch quality {
-        case .standard:
-            return "Good for most recordings"
-        case .high:
-            return "Clear, professional quality"
-        case .lossless:
-            return "Maximum audio fidelity"
-        }
+    private func refresh() async {
+        microphones = meter.getAvailableMicrophones()
+        if configuration.microphoneEnabled, !engine.isRecording { await meter.startMeter(deviceID: configuration.selectedMicrophoneDeviceID) }
+        else { meter.stopCapture() }
     }
-
-    private func qualityDetailedDescription(for quality: AudioConfiguration.AudioQuality) -> String {
-        switch quality {
-        case .standard:
-            return "🎵 128 kbps - Good quality for voice and presentations. Smaller file sizes (~1-2 MB/min)."
-        case .high:
-            return "🎧 192 kbps - Professional quality for demos and tutorials. Balanced size (~2-3 MB/min)."
-        case .lossless:
-            return "💎 256 kbps - Studio quality for music and high-fidelity recordings. Larger files (~4-5 MB/min)."
-        }
-    }
-
-    private func getProTip() -> String {
-        if configuration.microphoneEnabled {
-            return "Adjust microphone volume to balance your voice in the recording."
-        } else {
-            return "Enable microphone to include audio in your recording."
-        }
-    }
-}
-
-#Preview {
-    AudioSettingsView(configuration: .constant(.default))
-        .padding()
-        .frame(width: 350)
 }

@@ -1,78 +1,62 @@
-# EasyDemo - Screen Recorder
-![Release](https://badgen.net/github/release/danieloquelis/EasyDemo?label=Release)
-![Build Status](https://github.com/danieloquelis/EasyDemo/actions/workflows/build.yml/badge.svg)
-[![App Store](https://img.shields.io/badge/App%20Store-Download-blue?logo=apple&logoColor=white)](https://apps.apple.com/de/app/easydemo-screen-recorder/id6754762371?l=en-GB)
+# Cueframe
 
-A free, open-source screen recorder for macOS. Professional-quality recordings shouldn't be behind a paywall. For those who want a quick styled screen recording.
+<img src="assets/AppIcon.png" width="112" alt="Cueframe app icon">
 
-![EasyDemo Preview](assets/AppPreview.png)
+A native macOS recorder with a movable squircle webcam, microphone narration, optional Mac audio, and editable AI zoom suggestions. This fork retains [Daniel Oquelis’s EasyDemo](https://github.com/danieloquelis/EasyDemo) history and MIT license.
 
-## Description
+Requires **macOS 15.2 or later** and Xcode 16 or later to build. This version uses ScreenCaptureKit’s separate screen, microphone, and Mac audio outputs and AVFoundation camera capture.
 
-**EasyDemo** is a macOS-native screen recording application built with Swift and SwiftUI that captures selected windows with custom backgrounds and webcam overlays, producing high-quality local recordings similar to Screen Studio or Loom—but completely free.
+## Build and install
 
-Born from the frustration of screen recorders being locked behind paywalls, EasyDemo provides creators, developers, and everyone a styled and quick way to record their screen without subscription fees or usage limits.
+```sh
+git clone https://github.com/JoshuaColePhD/CueFrame.git
+cd CueFrame
+./scripts/build-local.sh --install
+open "/Applications/CueFrame.app"
+```
 
-The app is designed with an **offline-first** philosophy—everything is processed locally using Apple frameworks (ScreenCaptureKit, AVFoundation, Core Image). No data leaves your device, ensuring complete privacy and security.
+The script builds a locally signed Release app, verifies its signature, and creates `build/Cueframe-Mac.zip`. It remembers the selected local code-signing certificate in the ignored `build/signing-identity` file, or uses ad-hoc signing when none exists. No provisioning profile is needed for this personal build. It is not a notarized public distribution. Quit an older personal build before reinstalling. The original `com.easydemo` app has a different identifier and remains separate.
 
-You can download it from the AppStore:
+For reliable screen permissions across rebuilds, select the same stable code-signing certificate each time, for example `EASYDEMO_SIGN_IDENTITY="Flow Personal Local" ./scripts/build-local.sh --install` on this Mac. Ad-hoc builds change signing identity when their contents change, which can invalidate macOS privacy grants even when System Settings shows the switch enabled. When building directly in Xcode, use the same certificate in Signing settings.
 
-[![Download on the App Store](https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg)](https://apps.apple.com/de/app/easydemo-screen-recorder/id6754762371?l=en-GB&mt=12)
+Build output defaults to the system temporary directory to avoid cloud-file-provider Finder metadata interfering with signature verification. The ZIP stays in this workspace’s `build` folder. For a Debug build, set `CONFIGURATION=Debug`. Open `EasyDemo.xcodeproj` to work in Xcode. The installed Release identifier is `com.joshuacole.easydemo`; Debug/tests use `com.joshuacole.easydemo.debug` so development launches cannot replace the installed app’s privacy identity.
 
-### Core Principles
+Cueframe keeps this fork’s existing bundle identifiers, Keychain service, and recording storage path so the rename preserves permissions, projects, and preferences. The local installer installs `/Applications/CueFrame.app`, upgrades an existing personal installation, and retains its old bundle under the ignored `build/previous-installations` folder.
 
-- **Offline-first:** All processing happens locally—no cloud, no external dependencies
-- **Native UX:** Built entirely with Swift + SwiftUI, tightly integrated with macOS
-- **Professional Output:** Exported videos are high-quality and polished
-- **Simplicity:** Choose window → customize → record → export
+Cueframe’s logo is a folded play mark in lavender and mint on violet. Its editable vector is [assets/branding/Cueframe.svg](assets/branding/Cueframe.svg). Regenerate all macOS sizes with `swift scripts/generate-icon.swift`.
 
-## Current Features
+## Record
 
-### Window Recording
+1. Use **Choose window** or **Choose display** to open Apple’s built-in sharing picker. macOS authorizes the selected content for that capture session; the app does not require a successful global screen-permission preflight check.
+2. Check your microphone level. Choose a microphone and camera; permission requests appear when those inputs are used.
+3. Webcam and microphone start enabled. Mac audio is an independent toggle, initially off. For a window recording, audio follows the selected source; headphones prevent speaker sound from entering the microphone twice.
+4. Choose **Custom** webcam position to drag the overlay in the layout preview. Screen capture starts when you press Record; the editor provides the actual rendered video preview. The squircle preview and export use the same shape path.
+5. Start and stop with **⇧⌘R**, or use the menu bar stop button. A pending device-permission request has a **Cancel startup** action. Choose a fresh source for each recording session. Stopping opens the edit review.
 
-- Select any active macOS window with live thumbnails
-- Capture with native aesthetics (transparency, rounded corners, shadows)
-- Real-time preview before recording
-- High-quality 60fps recording using ScreenCaptureKit
+Export defaults to 1080p, 30 fps, H.264 MP4. Screen source tracks retain up to 4K detail for zooming. HEVC and ProRes exports use MOV. Settings persist between launches. The recorder saves source media automatically in its sandbox’s Application Support directory; **Recordings** reopens projects and **Show source files** reveals their location.
 
-### Background Customization
+## AI editing
 
-- Solid colors
-- Linear gradients
-- Custom images
-- Blur effects from wallpaper
+Open **Cueframe → Settings** (⌘,) and save your OpenAI API key in macOS Keychain. It never belongs in source code or a `.env` file.
 
-### Webcam Overlay
+After recording, choose **Generate AI Edit**. This explicitly sends JPEG screen samples, click coordinates, and microphone audio directly to OpenAI. Camera video and Mac audio stay local. API use is billed to your own OpenAI project. There are no API calls during recording or simply opening a preview.
 
-- 1080p camera capture using AVFoundation
-- Shape masking: Circle, Rounded Rectangle, Squircle
-- Customizable position and size
-- Optional border effects
-- Independent from window zoom/pan
+The editor uses `gpt-transcribe` for 30-second narration chunks and `gpt-6.1-sol` with structured output for zoom suggestions in one-minute sections. Completed transcript chunks are cached so failed requests can resume. Visual suggestions are validated before use. Narration timestamps describe chunks, not exact words.
 
-### Video Export
+Review zoom timing, scale, and horizontal/vertical targets. Disable a suggestion to undo it. **Find locally** suggests pauses longer than two seconds only when microphone silence, screen inactivity, cursor inactivity, and optional Mac audio silence have been observed. Missing observations are kept. Pause suggestions retain 0.3 seconds at either end; turn a trim off to restore the pause.
 
-- Multiple codec support: H.264, HEVC, ProRes
-- Resolutions up to 4K
-- Professional-grade output saved to `~/Movies/EasyDemo/`
-- Playback preview after recording
+Use **Preview changes** after adjusting suggestions. **Compare original** shows the unedited composition. Preview and export share a compositor: screen zooms do not enlarge or move the webcam. Edits are saved with the project, and original tracks are never replaced. Export writes a temporary output and replaces the chosen destination only after success. Without an API key, manual zooms, local pause detection, preview, and export remain available.
 
-### Permission Management
+A recording interrupted by a device or writer error retains its project and finalized source tracks. Force-quitting or losing power can leave an unfinished MOV that cannot be played; this version does not promise recovery of unfinished media containers.
 
-- Seamless screen recording permission flow
-- Camera access for webcam overlay
-- Privacy-focused with clear permission prompts
+## Development and tests
 
-## System Requirements
+```sh
+xcodebuild -project EasyDemo.xcodeproj -scheme EasyDemo \
+  -configuration Debug -derivedDataPath build/DerivedData \
+  -only-testing:EasyDemoTests test
+```
 
-- macOS 14.6 or later
-- Screen Recording permission
-- Camera access (for webcam overlay feature)
+Tests cover timeline cuts, settings and project persistence, conservative pause detection, AI response validation and request cancellation, export failure safety, a camera/voice composite, and a ten-minute synthetic timeline. Synthetic timing checks do not establish microphone/camera hardware drift. See [verification evidence](docs/VERIFICATION.md) for the checks actually completed on this Mac.
 
-## Privacy & Security
-
-All recording and processing happens **locally** on your Mac. No data is uploaded to any cloud service or external server. Your recordings are saved directly to your Movies folder with complete privacy.
-
----
-
-Built with Swift, SwiftUI, and native Apple frameworks.
+The upstream README is preserved in [docs/UPSTREAM.md](docs/UPSTREAM.md). Upstream App Store Fastlane files remain historical; this fork’s CI and local build use ad-hoc signing without deployment secrets.

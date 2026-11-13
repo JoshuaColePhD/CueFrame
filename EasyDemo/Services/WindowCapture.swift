@@ -50,7 +50,7 @@ class WindowCapture: ObservableObject {
 
             for window in content.windows {
                 // Skip windows from our own app
-                if window.owningApplication?.applicationName == "EasyDemo" {
+                if window.owningApplication?.bundleIdentifier == Bundle.main.bundleIdentifier {
                     continue
                 }
 
