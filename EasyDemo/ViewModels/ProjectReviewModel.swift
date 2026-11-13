@@ -93,7 +93,7 @@ final class ProjectReviewModel: ObservableObject {
         guard !busy, let project else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = project.codec == .h264 ? [.mpeg4Movie] : [.quickTimeMovie]
-        panel.nameFieldStringValue = "EasyDemo-\(project.created.formatted(.iso8601).replacingOccurrences(of: ":", with: "-"))\(original ? "-original" : "").\(project.codec == .h264 ? "mp4" : "mov")"
+        panel.nameFieldStringValue = "Cueframe-\(project.created.formatted(.iso8601).replacingOccurrences(of: ":", with: "-"))\(original ? "-original" : "").\(project.codec == .h264 ? "mp4" : "mov")"
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         let access = destination.startAccessingSecurityScopedResource()

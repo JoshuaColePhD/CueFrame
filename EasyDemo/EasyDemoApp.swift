@@ -34,7 +34,7 @@ struct EasyDemoApp: App {
 
     private func configureAppInfoMenu() -> some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button("About EasyDemo") {
+            Button("About Cueframe") {
                 AboutWindowController.shared.showAboutWindow()
             }
         }

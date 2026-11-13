@@ -3,20 +3,20 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>EasyDemo</string>
+	<string>Cueframe</string>
 	<key>CFBundleName</key>
-	<string>EasyDemo</string>
+	<string>Cueframe</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2025 Daniel Oquelis</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>EasyDemo needs access to your microphone to record audio commentary with your screen recordings.</string>
+	<string>Cueframe needs access to your microphone to record audio commentary with your screen recordings.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>EasyDemo needs access to your camera for webcam overlay recordings.</string>
+	<string>Cueframe needs access to your camera for webcam overlay recordings.</string>
 	<key>NSCameraUseContinuityCameraDeviceType</key>
 	<true/>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>EasyDemo needs to record your screen to capture the selected window.</string>
+	<string>Cueframe needs to record your screen to capture the selected window.</string>
 </dict>
 </plist>

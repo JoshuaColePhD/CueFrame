@@ -73,6 +73,7 @@ README text
 *.xcassets/** binary
 *.xcodeproj/** binary
 *.xcodeproj/project.pbxproj text diff
+*.xcodeproj/xcshareddata/xcschemes/*.xcscheme text diff
 *.framework/** binary
 *.xcframework/** binary
 *.app/** binary

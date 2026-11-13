@@ -114,7 +114,7 @@ struct SetupView: View {
                             .buttonStyle(.borderedProminent).keyboardShortcut("r", modifiers: [.command, .shift])
                     }
                 }.padding(20)
-            }.navigationTitle("EasyDemo")
+            }.navigationTitle("Cueframe")
         }
         .frame(minWidth: 1000, minHeight: 680)
         .toolbar {
@@ -146,7 +146,7 @@ struct SetupView: View {
             RecordingLibraryView { folder in pendingProject = folder; showingLibrary = false }
         }
         .sheet(item: $review) { destination in ProjectReviewView(folder: destination.folder) }
-        .alert("EasyDemo", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+        .alert("Cueframe", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
         } message: { Text(message ?? "") }
     }

@@ -107,7 +107,7 @@ struct RecordingProject: Codable, Identifiable {
     }
     static func load(folder: URL) throws -> Self {
         var value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: folder.appendingPathComponent("project.json")))
-        guard value.version == 1 else { throw EditingError.media("This project was created by a newer version of EasyDemo.") }
+        guard value.version == 1 else { throw EditingError.media("This project was created by a newer version of Cueframe.") }
         value.folder = folder
         _ = try value.mediaURL(value.screenFile)
         return value

@@ -1,4 +1,6 @@
-# EasyDemo Personal
+# Cueframe
+
+<img src="assets/AppIcon.png" width="112" alt="Cueframe app icon">
 
 A native macOS recorder with a movable squircle webcam, microphone narration, optional Mac audio, and editable AI zoom suggestions. This fork retains [Daniel Oquelis’s EasyDemo](https://github.com/danieloquelis/EasyDemo) history and MIT license.
 
@@ -8,14 +10,18 @@ Requires **macOS 15.2 or later** and Xcode 16 or later to build. This version us
 
 ```sh
 ./scripts/build-local.sh --install
-open "$HOME/Applications/EasyDemo Personal.app"
+open "$HOME/Applications/Cueframe.app"
 ```
 
-The script builds a locally signed Release app, verifies its signature, and creates `build/EasyDemo-Mac.zip`. It remembers the selected local code-signing certificate in the ignored `build/signing-identity` file, or uses ad-hoc signing when none exists. No provisioning profile is needed for this personal build. It is not a notarized public distribution. Quit an older personal build before reinstalling. The original `com.easydemo` app has a different identifier and remains separate.
+The script builds a locally signed Release app, verifies its signature, and creates `build/Cueframe-Mac.zip`. It remembers the selected local code-signing certificate in the ignored `build/signing-identity` file, or uses ad-hoc signing when none exists. No provisioning profile is needed for this personal build. It is not a notarized public distribution. Quit an older personal build before reinstalling. The original `com.easydemo` app has a different identifier and remains separate.
 
 For reliable screen permissions across rebuilds, select the same stable code-signing certificate each time, for example `EASYDEMO_SIGN_IDENTITY="Flow Personal Local" ./scripts/build-local.sh --install` on this Mac. Ad-hoc builds change signing identity when their contents change, which can invalidate macOS privacy grants even when System Settings shows the switch enabled. When building directly in Xcode, use the same certificate in Signing settings.
 
 Build output defaults to the system temporary directory to avoid cloud-file-provider Finder metadata interfering with signature verification. The ZIP stays in this workspace’s `build` folder. For a Debug build, set `CONFIGURATION=Debug`. Open `EasyDemo.xcodeproj` to work in Xcode. The installed Release identifier is `com.joshuacole.easydemo`; Debug/tests use `com.joshuacole.easydemo.debug` so development launches cannot replace the installed app’s privacy identity.
+
+Cueframe keeps this fork’s existing bundle identifiers, Keychain service, and recording storage path so the rename preserves permissions, projects, and preferences. The local installer upgrades an existing EasyDemo Personal installation and retains its old bundle under the ignored `build/previous-installations` folder.
+
+The new icon’s editable vector is [assets/branding/Cueframe.svg](assets/branding/Cueframe.svg). Regenerate all macOS sizes with `swift scripts/generate-icon.swift`.
 
 ## Record
 
@@ -29,7 +35,7 @@ Export defaults to 1080p, 30 fps, H.264 MP4. Screen source tracks retain up to 4
 
 ## AI editing
 
-Open **EasyDemo → Settings** (⌘,) and save your OpenAI API key in macOS Keychain. It never belongs in source code or a `.env` file.
+Open **Cueframe → Settings** (⌘,) and save your OpenAI API key in macOS Keychain. It never belongs in source code or a `.env` file.
 
 After recording, choose **Generate AI Edit**. This explicitly sends JPEG screen samples, click coordinates, and microphone audio directly to OpenAI. Camera video and Mac audio stay local. API use is billed to your own OpenAI project. There are no API calls during recording or simply opening a preview.
 

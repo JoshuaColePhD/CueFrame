@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "FBC949AC2EB04F5F00E00412"
-               BuildableName = "EasyDemo.app"
+               BuildableName = "Cueframe.app"
                BlueprintName = "EasyDemo"
                ReferencedContainer = "container:EasyDemo.xcodeproj">
             </BuildableReference>
@@ -69,7 +69,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FBC949AC2EB04F5F00E00412"
-            BuildableName = "EasyDemo.app"
+            BuildableName = "Cueframe.app"
             BlueprintName = "EasyDemo"
             ReferencedContainer = "container:EasyDemo.xcodeproj">
          </BuildableReference>
@@ -86,7 +86,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FBC949AC2EB04F5F00E00412"
-            BuildableName = "EasyDemo.app"
+            BuildableName = "Cueframe.app"
             BlueprintName = "EasyDemo"
             ReferencedContainer = "container:EasyDemo.xcodeproj">
          </BuildableReference>

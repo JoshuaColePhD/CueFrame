@@ -25,7 +25,7 @@
 
 /* Begin PBXFileReference section */
 		03C25D6D51B8253E0C30C237 /* EasyDemo.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = EasyDemo.entitlements; path = EasyDemo/EasyDemo.entitlements; sourceTree = "<group>"; };
-		FBC949AD2EB04F5F00E00412 /* EasyDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EasyDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FBC949AD2EB04F5F00E00412 /* Cueframe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cueframe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FBC949BA2EB04F6100E00412 /* EasyDemoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EasyDemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FBC949C42EB04F6100E00412 /* EasyDemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EasyDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -96,7 +96,7 @@
 		FBC949AE2EB04F5F00E00412 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				FBC949AD2EB04F5F00E00412 /* EasyDemo.app */,
+				FBC949AD2EB04F5F00E00412 /* Cueframe.app */,
 				FBC949BA2EB04F6100E00412 /* EasyDemoTests.xctest */,
 				FBC949C42EB04F6100E00412 /* EasyDemoUITests.xctest */,
 			);
@@ -123,7 +123,7 @@
 			);
 			name = EasyDemo;
 			productName = EasyDemo;
-			productReference = FBC949AD2EB04F5F00E00412 /* EasyDemo.app */;
+			productReference = FBC949AD2EB04F5F00E00412 /* Cueframe.app */;
 			productType = "com.apple.product-type.application";
 		};
 		FBC949B92EB04F6100E00412 /* EasyDemoTests */ = {
@@ -415,12 +415,12 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = EasyDemo/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = EasyDemo;
+				INFOPLIST_KEY_CFBundleDisplayName = Cueframe;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSCameraUsageDescription = "EasyDemo needs access to your camera to add webcam overlay to your recordings.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Cueframe needs access to your camera to add webcam overlay to your recordings.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "EasyDemo needs access to your microphone to record audio with your screen recordings.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Cueframe needs access to your microphone to record audio with your screen recordings.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -428,7 +428,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.joshuacole.easydemo.debug;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = EasyDemo;
+				PRODUCT_NAME = Cueframe;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				REGISTER_APP_GROUPS = YES;
@@ -459,12 +460,12 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = EasyDemo/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = EasyDemo;
+				INFOPLIST_KEY_CFBundleDisplayName = Cueframe;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSCameraUsageDescription = "EasyDemo needs access to your camera to add webcam overlay to your recordings.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Cueframe needs access to your camera to add webcam overlay to your recordings.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "EasyDemo needs access to your microphone to record audio with your screen recordings.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Cueframe needs access to your microphone to record audio with your screen recordings.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -472,7 +473,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.joshuacole.easydemo;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = EasyDemo;
+				PRODUCT_NAME = Cueframe;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				REGISTER_APP_GROUPS = YES;
@@ -501,7 +503,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/EasyDemo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/EasyDemo";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cueframe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Cueframe";
 			};
 			name = Debug;
 		};
@@ -522,7 +524,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/EasyDemo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/EasyDemo";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cueframe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Cueframe";
 			};
 			name = Release;
 		};

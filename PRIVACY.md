@@ -1,4 +1,4 @@
-# Privacy in EasyDemo Personal
+# Privacy in Cueframe
 
 Screen recording, webcam capture, microphone monitoring, playback, and export run locally with Apple frameworks. The application does not implement analytics or automatic recording uploads.
 

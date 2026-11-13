@@ -66,7 +66,7 @@ struct OnboardingView: View {
                                     icon: "video.badge.checkmark",
                                     title: "Screen Recording",
                                     description: """
-                                        EasyDemo needs permission to capture your screen \
+                                        Cueframe needs permission to capture your screen \
                                         for creating professional recordings.
                                         """,
                                     pageNumber: 1,

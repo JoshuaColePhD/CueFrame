@@ -108,7 +108,7 @@ struct ProjectReviewView: View {
         .onChange(of: model.plan) { model.saveEdits() }
         .onChange(of: model.original) { model.refreshPreview() }
         .onDisappear { model.close() }
-        .alert("EasyDemo", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
+        .alert("Cueframe", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button("OK") { model.message = nil }
         } message: { Text(model.message ?? "") }
     }
