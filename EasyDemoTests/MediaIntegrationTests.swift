@@ -33,8 +33,15 @@ struct MediaIntegrationTests {
         let duration = try await asset.load(.duration).seconds
         #expect(abs(duration - 6) < 0.11)
         let generator = AVAssetImageGenerator(asset: asset)
-        let unzoomed = try await generator.image(at: ProjectRenderer.time(0.8)).image
-        let zoomed = try await generator.image(at: ProjectRenderer.time(2.5)).image
+        // The default infinite tolerance can return the same keyframe for both requests.
+        // Compare the intended moments, independently of the encoder's GOP layout.
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let beforeFrame = try await generator.image(at: ProjectRenderer.time(0.8))
+        let afterFrame = try await generator.image(at: ProjectRenderer.time(2.5))
+        #expect(abs(beforeFrame.actualTime.seconds - 0.8) < 1.0 / 30)
+        #expect(abs(afterFrame.actualTime.seconds - 2.5) < 1.0 / 30)
+        let unzoomed = beforeFrame.image, zoomed = afterFrame.image
         let first = colorBounds(unzoomed), second = colorBounds(zoomed)
         #expect(first != nil)
         let before = try #require(first), after = try #require(second)
