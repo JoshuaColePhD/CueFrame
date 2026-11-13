@@ -12,6 +12,7 @@ Verified on the user's Apple Silicon Mac with macOS 27.2.1 and Xcode 27.2. The p
 - A further **20.561-second display recording**, with all four inputs enabled, captured an audible system test sound. The Mac audio track had a measured peak of **−14.1 dBFS**. The Mac audio preference was restored to off afterward.
 - Native review playback, manual zoom controls, original comparison, project reopening, and save-panel export were exercised. A synthetic media integration test verifies that zooms enlarge the screen target while the camera's bounds stay fixed within one encoded pixel, and that cuts affect every track together.
 - The shared squircle path is used by preview and export. Source selection and recording preferences survive app relaunch. A permission request can be cancelled without a late grant starting a recording.
+- The user selected **HD Pro Webcam C920**. This device choice was saved, and a 26.292-second screen/camera/microphone recording completed without capture errors. Moving the squircle using Custom position was verified manually, then its position was restored to Bottom Left. The C920 source image is currently nearly black; see the remaining camera check below.
 
 ## Timing evidence and limits
 
@@ -32,8 +33,8 @@ The ten-minute synthetic writer and composition tests pass their timing checks, 
 
 ## Remaining verification
 
-- **Live OpenAI editing:** no API key was saved during verification. Missing-key, HTTP failure, cancellation, and output-validation behavior passed automated tests; an actual transcription/visual-analysis request remains unverified. Enter a key in the app's Settings and invoke Generate AI Edit on a recording to complete this check. Camera and Mac audio are not uploaded.
-- The current system-default camera delivered a valid but nearly black image. Device permission and frame delivery succeeded; camera selection, lighting, or a physical privacy cover should be checked for a useful picture. The available devices include FaceTime HD, the user's iPhone camera, and a C920.
+- **Live OpenAI editing:** the user chose to leave this test for later. No API key was saved during verification. Missing-key, HTTP failure, cancellation, and output-validation behavior passed automated tests; an actual transcription/visual-analysis request remains unverified. Enter a key in the app's Settings and invoke Generate AI Edit on a recording to complete this check. Camera and Mac audio are not uploaded.
+- The selected C920 delivers valid but nearly black pixels in both preview and the independent camera source file. Device permission and frame delivery succeeded. A physical lens/privacy-cover or camera hardware setting check is pending; this is not only a squircle/export appearance issue. The available alternatives include FaceTime HD and the user's iPhone camera.
 - Real hardware disconnects and every combination of macOS permission denial were not forced during the live recording. The implementation has explicit unavailable-device checks, startup cleanup, and camera/microphone stall handling; automated coverage does not simulate every physical fault.
 - This is a local personal build, not a notarized public installer. Remote GitHub CI status is separate from the passing local checks.
 
